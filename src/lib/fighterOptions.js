@@ -146,7 +146,8 @@ export const ULTIMATE_LEVELS = [
 export const POWER_POINT_CAPS = {
   "1v1": 10,
   "2v2": 9,
-  "3v3": 8
+  "3v3": 8,
+  "5v5": 7
 };
 
 export const STAT_KEYS = ["strength", "speed", "durability", "battle_iq", "stamina"];

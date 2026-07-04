@@ -1,7 +1,8 @@
 import React from "react";
 
 const MODES = [
-  { key: "vsComputer", title: "VS Computer", sub: "Pick your fighters, fight an AI roster" },
+  { key: "vsComputer", title: "VS Computer", sub: "Pick your fighters, fight a random AI roster" },
+  { key: "vsCommunity", title: "VS Community", sub: "Fight a build made by a real Power Clash player" },
   { key: "fightFriend", title: "Fight a Friend", sub: "Battle a friend's fighters directly" },
   { key: "enterCode", title: "Enter Battle Code", sub: "Send or receive a Fighter/Roster Code" },
   { key: "story", title: "Story Mode", sub: "Pick a fighter and begin your campaign" }
@@ -9,7 +10,8 @@ const MODES = [
 
 export default function ChooseMode({ onNavigate }) {
   const handleSelect = (mode) => {
-    if (mode.key === "vsComputer") return onNavigate("battleFlow", { mode: "computer" });
+    if (mode.key === "vsComputer") return onNavigate("battleFlow", { mode: "computer", singlePlayerMode: "ai" });
+    if (mode.key === "vsCommunity") return onNavigate("battleFlow", { mode: "computer", singlePlayerMode: "community" });
     if (mode.key === "fightFriend") return onNavigate("battleFlow", { mode: "friend" });
     if (mode.key === "enterCode") return onNavigate("battleCode");
     if (mode.key === "story") return onNavigate("storyModeSetup");

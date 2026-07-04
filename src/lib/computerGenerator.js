@@ -157,7 +157,7 @@ export function generateComputerFighter(battleMode) {
 }
 
 export function generateComputerTeam(battleMode) {
-  const countMap = { "1v1": 1, "2v2": 2, "3v3": 3 };
+  const countMap = { "1v1": 1, "2v2": 2, "3v3": 3, "5v5": 5 };
   const count = countMap[battleMode] || 1;
   const fighters = Array.from({ length: count }, () => generateComputerFighter(battleMode));
   return {

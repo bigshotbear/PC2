@@ -6,7 +6,7 @@ import FighterVisual from "../components/FighterVisual.jsx";
 
 const LEVEL_COLORS = { Bronze: "#c17a4a", Silver: "#b7bfc9", Gold: "var(--gold-bright)" };
 
-const MODE_COUNTS = { "1v1": 1, "2v2": 2, "3v3": 3 };
+const MODE_COUNTS = { "1v1": 1, "2v2": 2, "3v3": 3, "5v5": 5 };
 
 export default function TeamBuilder({ user, teamId, onNavigate }) {
   const [battleMode, setBattleMode] = useState("1v1");
@@ -165,6 +165,7 @@ export default function TeamBuilder({ user, teamId, onNavigate }) {
             <option value="1v1">1v1 — 1 fighter</option>
             <option value="2v2">2v2 — 2 fighters</option>
             <option value="3v3">3v3 — 3 fighters</option>
+            <option value="5v5">5v5 — 5 fighters</option>
           </select>
         </div>
 

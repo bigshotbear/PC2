@@ -24,6 +24,7 @@ export default function Dashboard({ profile, onNavigate, onLogout }) {
       </div>
 
       <div className="stat-grid" style={{ marginBottom: 20 }}>
+        <StatCard label="Victory Ribbons" value={profile?.total_ribbons ?? 0} tone="gold" />
         <StatCard label="Total Wins" value={profile?.total_wins ?? 0} tone="win" />
         <StatCard label="Total Losses" value={profile?.total_losses ?? 0} tone="loss" />
         <StatCard label="Total Battles" value={profile?.total_battles ?? 0} />

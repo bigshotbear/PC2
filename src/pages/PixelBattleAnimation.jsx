@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import FighterVisual from "../components/FighterVisual.jsx";
 
-export default function PixelBattleAnimation({ battleResult, iWon, onNavigate }) {
+export default function PixelBattleAnimation({ battleResult, iWon, totalRibbons, rematchConfig, onNavigate }) {
   const rounds = battleResult.animation_rounds || [];
   const [roundIndex, setRoundIndex] = useState(-1); // -1 = not started
   const [healthA, setHealthA] = useState(100);
@@ -111,7 +111,7 @@ export default function PixelBattleAnimation({ battleResult, iWon, onNavigate })
           <div className={`card-value ${iWon ? "win" : "loss"}`} style={{ marginBottom: 10 }}>
             {iWon ? "VICTORY" : "DEFEAT"}
           </div>
-          <button className="btn btn-primary" onClick={() => onNavigate("battleResult", { battleResult, iWon })}>
+          <button className="btn btn-primary" onClick={() => onNavigate("battleResult", { battleResult, iWon, totalRibbons, rematchConfig })}>
             See Full Breakdown
           </button>
         </div>

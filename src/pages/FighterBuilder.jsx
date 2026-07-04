@@ -384,6 +384,7 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
             <option value={POWER_POINT_CAPS["1v1"]}>1v1 — cap 10</option>
             <option value={POWER_POINT_CAPS["2v2"]}>2v2 — cap 9</option>
             <option value={POWER_POINT_CAPS["3v3"]}>3v3 — cap 8</option>
+            <option value={POWER_POINT_CAPS["5v5"]}>5v5 — cap 7</option>
           </select>
         </div>
         <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.6 }}>

@@ -163,7 +163,14 @@ export default function App() {
       {view.name === "friends" && <Friends user={session.user} profile={profile} onNavigate={navigate} />}
 
       {view.name === "battleFlow" && (
-        <BattleFlow user={session.user} profile={profile} mode={view.params.mode} preselectedFighterId={view.params.preselectedFighterId || null} onNavigate={navigate} />
+        <BattleFlow
+          user={session.user}
+          profile={profile}
+          mode={view.params.mode}
+          singlePlayerMode={view.params.singlePlayerMode || null}
+          preselectedFighterId={view.params.preselectedFighterId || null}
+          onNavigate={navigate}
+        />
       )}
 
       {view.name === "battleCode" && (
@@ -194,14 +201,20 @@ export default function App() {
         <PixelBattleAnimation
           battleResult={view.params.battleResult}
           iWon={view.params.iWon}
+          totalRibbons={view.params.totalRibbons}
+          rematchConfig={view.params.rematchConfig}
           onNavigate={navigate}
         />
       )}
 
       {view.name === "battleResult" && (
         <BattleResult
+          user={session.user}
+          profile={profile}
           battleResult={view.params.battleResult}
           iWon={view.params.iWon}
+          totalRibbons={view.params.totalRibbons}
+          rematchConfig={view.params.rematchConfig}
           onNavigate={navigate}
         />
       )}

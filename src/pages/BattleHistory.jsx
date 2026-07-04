@@ -31,8 +31,11 @@ export default function BattleHistory({ user, onNavigate }) {
     const iWon = selected.winner_id === user.id;
     return (
       <BattleResult
+        user={user}
         battleResult={selected}
         iWon={iWon}
+        totalRibbons={undefined}
+        rematchConfig={null}
         onNavigate={(name, params) => {
           if (name === "battleHistory") {
             setSelected(null);

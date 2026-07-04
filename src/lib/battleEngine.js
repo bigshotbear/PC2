@@ -2,6 +2,13 @@
 // POWER CLASH — BATTLE ENGINE
 // Deterministic-ish scoring with small randomness so repeated
 // fights between the same two teams don't always read identically.
+//
+// Every fighter's final score is also broken into 5 buckets
+// (damage / defense / support / tactics / badges) that always sum
+// exactly to that fighter's score — used for the post-fight donut
+// chart, contribution bars, and score ledger. Nothing here is
+// invented after the fact; the buckets are derived from the same
+// weights used to build the score in the first place.
 // ============================================================
 
 import { detectSynergies } from "./teamHelpers";
@@ -9,8 +16,9 @@ import {
   calculateFighterBadges,
   calculateTeamBadges,
   calculateMatchupBadges,
-  getAggregateBadgeMultiplier
+  getBadgeModifier
 } from "./badgeEngine";
+import { resolveActiveBadges } from "./badgeLoadout";
 
 export const POWER_COUNTERS = {
   Water: ["Fire"],
@@ -28,8 +36,8 @@ export const POWER_COUNTERS = {
   Technology: ["Magic", "Sound"],
   Nature: ["Earth", "Water"],
   Poison: ["Nature"],
-  Gravity: ["Super Speed", "Flight"], // matched against powers, not sources
-  Sound: ["Stealth", "Illusions"], // matched against special_skill / powers
+  Gravity: ["Super Speed", "Flight"],
+  Sound: ["Stealth", "Illusions"],
   "Spirit Energy": ["Shadow", "Poison"]
 };
 
@@ -63,122 +71,108 @@ function isCountered(mySource, opponentSource) {
   return (POWER_COUNTERS[mySource] || []).includes(opponentSource);
 }
 
-/**
- * Computes an individual fighter's contribution score for this fight,
- * folding in stats, powers, fighting-style modifiers, weakness penalties,
- * arena effects, counters, synergy bonuses, and a small random factor.
- */
-function computeFighterScore(fighter, { arena, twist, synergies, opponentFighters, badgeMultiplier = 1 }) {
-  const stats =
-    fighter.strength +
-    fighter.speed +
-    fighter.durability +
-    fighter.battle_iq * 1.08 + // Battle IQ counts a bit more — but not enough to solo-carry a build
-    fighter.stamina;
+/** This fighter's earned badges filtered down to just the equipped (max 4) ones, with real tiers. */
+export function getEquippedBadgeObjects(fighter) {
+  const earned = calculateFighterBadges(fighter, fighter.power_point_cost, fighter.power_point_cap);
+  const activeNames = resolveActiveBadges(fighter);
+  return earned.filter((b) => activeNames.includes(b.name));
+}
 
-  let score =
-    stats +
-    fighter.main_power_level * 4 +
-    fighter.secondary_power_level * 3 +
-    fighter.ultimate_level * 3.5 * (fighter.fighting_style === "Weapon Master" ? 1.1 : 1) +
-    (fighter.special_skill && fighter.special_skill !== "None" ? 5 : 0);
+/**
+ * Computes one fighter's score AND a breakdown that sums exactly to it.
+ * Everything except the badge bonus is folded into `preBadge`, so
+ * `finalScore - preBadge` isolates exactly how much the equipped badges
+ * contributed — no guessing after the fact.
+ */
+export function computeFighterScore(fighter, { arena, twist, synergies, opponentFighters, equippedBadges }) {
+  const weaponMasterMult = fighter.fighting_style === "Weapon Master" ? 1.1 : 1;
+  let dmgW = fighter.strength + fighter.speed * 0.7 + fighter.main_power_level * 4 + fighter.secondary_power_level * 3;
+  let defW = fighter.durability;
+  let supW = fighter.stamina * (fighter.fighting_style === "Support/Healer" ? 1.3 : 0.55);
+  let tacW = fighter.battle_iq * 1.08 + fighter.ultimate_level * 3.5 * weaponMasterMult + (fighter.special_skill !== "None" ? 5 : 0);
 
   const notes = [];
 
-  // --- Fighting style role modifiers ---
-  if (fighter.fighting_style === "Brawler") {
-    score += fighter.strength * 0.1;
-  }
+  if (fighter.fighting_style === "Brawler") dmgW += fighter.strength * 0.1;
   if (fighter.fighting_style === "Speedster") {
-    score += fighter.speed * 0.15;
+    dmgW += fighter.speed * 0.15;
     notes.push(`${fighter.fighter_name} surges ahead early with Speedster initiative.`);
   }
   if (fighter.fighting_style === "Tank" || fighter.fighting_style === "Defender") {
-    const excessStamina = Math.max(0, fighter.stamina - 20);
-    score += excessStamina * 0.1;
+    defW += Math.max(0, fighter.stamina - 20) * 0.1;
   }
 
-  // --- Weakness contradiction penalties ---
-  if (fighter.weakness === "Low Stamina" && fighter.stamina < 15) score -= 8;
-  if (fighter.weakness === "Weak Defense" && fighter.durability < 15) score -= 8;
-  if (fighter.weakness === "Needs Focus" && fighter.battle_iq < 15) score -= 8;
-  if (fighter.weakness === "Ultimate Drains Body" && fighter.stamina < 20) score -= 4;
+  if (fighter.weakness === "Low Stamina" && fighter.stamina < 15) supW -= 8;
+  if (fighter.weakness === "Weak Defense" && fighter.durability < 15) defW -= 8;
+  if (fighter.weakness === "Needs Focus" && fighter.battle_iq < 15) tacW -= 8;
+  if (fighter.weakness === "Ultimate Drains Body" && fighter.stamina < 20) tacW -= 4;
 
-  // --- Battle twist adjustments ---
-  if (twist === "Fog lowers accuracy and rewards Battle IQ") {
-    score += fighter.battle_iq * 0.08;
-  }
-  if (twist === "Energy drain makes Stamina extra important") {
-    score += fighter.stamina * 0.08;
-  }
-  if (twist === "No ultimates for the first minute") {
-    score -= fighter.ultimate_level * 1.5;
-  }
+  if (twist === "Fog lowers accuracy and rewards Battle IQ") tacW += fighter.battle_iq * 0.08;
+  if (twist === "Energy drain makes Stamina extra important") supW += fighter.stamina * 0.08;
+  if (twist === "No ultimates for the first minute") tacW -= fighter.ultimate_level * 1.5;
 
-  // --- Arena boost/penalty ---
+  let preBadge = Math.max(1, dmgW + defW + supW + tacW);
+
   const isStrategist = ["Strategist", "Tactician"].includes(fighter.fighting_style);
-  if (arena.boost.includes(fighter.power_source)) {
-    score *= 1.12;
-  } else if (arena.penalty.includes(fighter.power_source)) {
-    score *= isStrategist ? 0.904 : 0.88; // Strategist/Tactician cuts the penalty by 20%
-  }
+  let arenaMult = 1;
+  if (arena.boost.includes(fighter.power_source)) arenaMult = 1.12;
+  else if (arena.penalty.includes(fighter.power_source)) arenaMult = isStrategist ? 0.904 : 0.88;
 
-  // --- Power source counters vs opponent roster ---
-  let counterBonus = 0;
-  let counteredPenalty = 0;
+  let counterBonus = 0, counteredPenalty = 0;
   const opponentSources = [...new Set(opponentFighters.map((f) => f.power_source))];
   opponentSources.forEach((oppSource) => {
     if (isCountered(fighter.power_source, oppSource)) counterBonus += 0.08;
     if (isCountered(oppSource, fighter.power_source)) counteredPenalty += 0.08;
   });
-  score *= 1 + Math.min(counterBonus, 0.16) - Math.min(counteredPenalty, 0.16);
+  const counterMult = 1 + Math.min(counterBonus, 0.16) - Math.min(counteredPenalty, 0.16);
 
-  // --- Team synergy modifiers ---
+  let synergyMult = 1;
+  let synergyFlat = 0;
   synergies.forEach((syn) => {
-    if (syn.type === "brawler_strength_up" && fighter.fighting_style === "Brawler") {
-      score += fighter.strength * syn.meta.amount;
-    }
-    if (syn.type === "source_resonance" && fighter.power_source === syn.meta.source) {
-      score *= 1 + syn.meta.amount;
-    }
-    if (syn.type === "turn_order_bonus") {
-      score *= 1 + syn.meta.amount;
-    }
+    if (syn.type === "brawler_strength_up" && fighter.fighting_style === "Brawler") synergyFlat += fighter.strength * syn.meta.amount;
+    if (syn.type === "source_resonance" && fighter.power_source === syn.meta.source) synergyMult *= 1 + syn.meta.amount;
+    if (syn.type === "turn_order_bonus") synergyMult *= 1 + syn.meta.amount;
   });
 
-  // --- Badges: small, capped bonus for a well-built fighter ---
-  score *= badgeMultiplier;
+  preBadge = Math.max(1, (preBadge + synergyFlat) * arenaMult * counterMult * synergyMult);
 
-  // --- Clash Coach creative synergy: approved reviews only, hard-capped 4% ---
   const aiMod = Number(fighter.ai_synergy_modifier) || 0;
   const aiReview = fighter.ai_synergy_review;
+  let aiMult = 1;
   if (aiMod > 0 && aiReview && ["approved", "partially_approved"].includes(aiReview.status)) {
-    score *= 1 + Math.min(4, aiMod) / 100;
+    aiMult = 1 + Math.min(4, aiMod) / 100;
     notes.push(`${aiReview.title || "Creative synergy"} activated at ${Math.min(4, aiMod)}%.`);
   }
 
-  // --- Small randomness so repeated fights vary slightly ---
-  score *= rand(0.95, 1.05);
+  const randomMult = rand(0.95, 1.05);
+  const riskMult = fighter.ultimate_move === "One Huge Attack" ? rand(0.78, 1.32) : 1;
 
-  // --- "One Huge Attack" is high risk / high reward: same average impact
-  // as other Ultimates, but far less consistent, so it can't be relied on
-  // to guarantee a win the way a steady build can.
-  if (fighter.ultimate_move === "One Huge Attack") {
-    score *= rand(0.78, 1.32);
-  }
+  preBadge = Math.max(1, preBadge * aiMult * randomMult * riskMult);
 
-  return { score: Math.max(1, score), notes };
+  const badgeMultiplier = 1 + Math.min(0.15, equippedBadges.reduce((sum, b) => sum + getBadgeModifier(b.level), 0));
+  const finalScore = preBadge * badgeMultiplier;
+  const badgeContribution = finalScore - preBadge;
+
+  const weightTotal = Math.max(1, dmgW + defW + supW + tacW);
+  const breakdown = {
+    damage: Math.max(0, preBadge * (dmgW / weightTotal)),
+    defense: Math.max(0, preBadge * (defW / weightTotal)),
+    support: Math.max(0, preBadge * (supW / weightTotal)),
+    tactics: 0,
+    badges: Math.max(0, badgeContribution)
+  };
+  breakdown.tactics = Math.max(0, finalScore - breakdown.damage - breakdown.defense - breakdown.support - breakdown.badges);
+
+  return { score: Math.max(1, finalScore), breakdown, notes, equippedBadges };
 }
 
 function applyOpponentSynergyPenalties(fighters, opponentSynergies) {
-  // Conductive Storm / Thermal Shock affect the OPPONENT team, applied here
-  // as a flat multiplier passed back to the caller for the whole team.
   let teamMultiplier = 1;
   const appliedNotes = [];
 
   opponentSynergies.forEach((syn) => {
     if (syn.type === "enemy_speed_down") {
-      teamMultiplier -= syn.meta.amount * 0.3; // dampened — affects score, not raw speed stat
+      teamMultiplier -= syn.meta.amount * 0.3;
       appliedNotes.push("Conductive Storm dampened their tempo.");
     }
     if (syn.type === "enemy_tank_durability_down") {
@@ -222,39 +216,38 @@ function buildAnimationRounds(winnerSide, teamA, teamB) {
 
     let newHealth = health[defenderSide] - damage;
     if (defenderSide === winnerSide) {
-      newHealth = Math.max(newHealth, 18); // winner never actually falls
+      newHealth = Math.max(newHealth, 18);
     } else {
       newHealth = Math.max(newHealth, 0);
     }
     health[defenderSide] = newHealth;
 
     rounds.push({
-      attackerSide,
-      defenderSide,
-      attackerName: attacker.fighter_name,
-      moveName,
-      damageAmount: damage,
-      defenderHealthAfter: newHealth
+      attackerSide, defenderSide,
+      attackerName: attacker.fighter_name, moveName,
+      damageAmount: damage, defenderHealthAfter: newHealth
     });
 
     if (newHealth <= 0) break;
   }
 
-  // Safety net: force a finishing blow if the loop cap was hit.
   if (health[loserSide] > 0) {
     const roster = rosters[winnerSide];
     const attacker = roster[0];
     rounds.push({
-      attackerSide: winnerSide,
-      defenderSide: loserSide,
-      attackerName: attacker.fighter_name,
-      moveName: attacker.ultimate_move,
-      damageAmount: health[loserSide],
-      defenderHealthAfter: 0
+      attackerSide: winnerSide, defenderSide: loserSide,
+      attackerName: attacker.fighter_name, moveName: attacker.ultimate_move,
+      damageAmount: health[loserSide], defenderHealthAfter: 0
     });
   }
 
   return rounds;
+}
+
+function findPlayOfTheMatch(animationRounds) {
+  if (!animationRounds || animationRounds.length === 0) return null;
+  const biggest = animationRounds.reduce((best, r) => (r.damageAmount > best.damageAmount ? r : best), animationRounds[0]);
+  return `${biggest.attackerName} landed the biggest hit of the fight with ${biggest.moveName} for ${biggest.damageAmount} damage.`;
 }
 
 function buildLossReasons(loserFighters, winnerFighters, loserSynergies, winnerSynergies, arena, capOk) {
@@ -273,9 +266,7 @@ function buildLossReasons(loserFighters, winnerFighters, loserSynergies, winnerS
   if (badMatchup) reasons.push("Bad type matchup — their power source directly countered yours.");
 
   if (winnerSynergies.length > loserSynergies.length) reasons.push("Enemy team synergies outclassed your own team composition.");
-
   if (arena.penalty.some((p) => loserSources.includes(p))) reasons.push(`Arena disadvantage on ${arena.name}.`);
-
   if (!capOk) reasons.push("A fighter exceeded the power point cap for this mode.");
 
   const weaknesses = new Set(loserFighters.map((f) => f.weakness));
@@ -283,13 +274,11 @@ function buildLossReasons(loserFighters, winnerFighters, loserSynergies, winnerS
 
   const hasUltimate = loserFighters.some((f) => f.ultimate_level >= 3);
   if (!hasUltimate) reasons.push("No fight-changing finisher to close the gap.");
-
   if (avg(loserFighters, "durability") < 15) reasons.push("No real defense — damage went through unmitigated.");
 
   const counterToWinner = loserSources.some((ls) => Object.keys(POWER_COUNTERS).includes(ls) && POWER_COUNTERS[ls].some((c) => winnerSources.includes(c)));
   if (!counterToWinner) reasons.push("No counter prepared for the opponent's dominant power source.");
 
-  // De-dupe and cap at 5
   return [...new Set(reasons)].slice(0, 5);
 }
 
@@ -309,15 +298,49 @@ function buildImprovementTips(reasons) {
     "No counter prepared for the opponent's dominant power source.": "Keep a flexible bench with different power sources for favorable matchups."
   };
   const tips = reasons.map((r) => tipMap[r]).filter(Boolean);
-  if (tips.length === 0) {
-    tips.push("Small margin loss — minor stat or power-level tweaks could flip this next time.");
-  }
+  if (tips.length === 0) tips.push("Small margin loss — minor stat or power-level tweaks could flip this next time.");
   return [...new Set(tips)].slice(0, 5);
+}
+
+function aggregateBreakdown(scored) {
+  return scored.reduce((acc, s) => ({
+    damage: acc.damage + s.breakdown.damage,
+    defense: acc.defense + s.breakdown.defense,
+    support: acc.support + s.breakdown.support,
+    tactics: acc.tactics + s.breakdown.tactics,
+    badges: acc.badges + s.breakdown.badges
+  }), { damage: 0, defense: 0, support: 0, tactics: 0, badges: 0 });
+}
+
+export function buildScoreLedger(breakdown, total) {
+  const r1 = (n) => Math.round(n * 10) / 10;
+  return [
+    { label: "Base damage impact", value: r1(breakdown.damage) },
+    { label: "Defense and damage prevented", value: r1(breakdown.defense) },
+    { label: "Support and healing", value: r1(breakdown.support) },
+    { label: "Tactical actions", value: r1(breakdown.tactics) },
+    { label: "Active badge effects", value: r1(breakdown.badges) },
+    { label: "TOTAL", value: r1(total) }
+  ];
+}
+
+function buildFighterContributions(scored) {
+  return scored.map((s) => ({
+    fighter_name: s.fighter.fighter_name,
+    total_impact: Math.round(s.score * 10) / 10,
+    damage: Math.round(s.breakdown.damage * 10) / 10,
+    defense: Math.round(s.breakdown.defense * 10) / 10,
+    support: Math.round(s.breakdown.support * 10) / 10,
+    tactics: Math.round(s.breakdown.tactics * 10) / 10,
+    badges: Math.round(s.breakdown.badges * 10) / 10,
+    equipped_badges: s.equippedBadges.map((b) => b.name)
+  }));
 }
 
 /**
  * Main entry point. Takes two team snapshots (array-of-fighters + label)
- * and returns a full battle_history-shaped result object.
+ * and returns a full battle_history-shaped result object, including a
+ * real (non-fabricated) impact breakdown for the post-fight screen.
  */
 export function runBattle({ teamA, teamB, battleMode, battleType }) {
   const fightersA = teamA.fighter_snapshots || teamA.fighters;
@@ -329,33 +352,27 @@ export function runBattle({ teamA, teamB, battleMode, battleType }) {
   const synergiesA = detectSynergies(fightersA);
   const synergiesB = detectSynergies(fightersB);
 
-  const { teamMultiplier: multiplierA, appliedNotes: notesFromBOnA } = applyOpponentSynergyPenalties(fightersA, synergiesB);
-  const { teamMultiplier: multiplierB, appliedNotes: notesFromAOnB } = applyOpponentSynergyPenalties(fightersB, synergiesA);
+  const { teamMultiplier: multiplierA } = applyOpponentSynergyPenalties(fightersA, synergiesB);
+  const { teamMultiplier: multiplierB } = applyOpponentSynergyPenalties(fightersB, synergiesA);
 
-  // --- Badges: computed from existing fields only, nothing new to save ---
-  const fighterBadgesA = fightersA.map((f) => calculateFighterBadges(f, f.power_point_cost, f.power_point_cap));
-  const fighterBadgesB = fightersB.map((f) => calculateFighterBadges(f, f.power_point_cost, f.power_point_cap));
   const teamBadgesA = calculateTeamBadges(teamA);
   const teamBadgesB = calculateTeamBadges(teamB);
   const matchupBadgesA = calculateMatchupBadges(teamA, teamB);
   const matchupBadgesB = calculateMatchupBadges(teamB, teamA);
+  const teamBadgeMultiplierA = 1 + Math.min(0.15, [...teamBadgesA, ...matchupBadgesA].reduce((s, b) => s + getBadgeModifier(b.level), 0));
+  const teamBadgeMultiplierB = 1 + Math.min(0.15, [...teamBadgesB, ...matchupBadgesB].reduce((s, b) => s + getBadgeModifier(b.level), 0));
 
-  const teamBadgeMultiplierA = getAggregateBadgeMultiplier([teamBadgesA, matchupBadgesA]);
-  const teamBadgeMultiplierB = getAggregateBadgeMultiplier([teamBadgesB, matchupBadgesB]);
+  // Each fighter's own EQUIPPED (max 4) badges only — never their full collection.
+  const equippedObjA = fightersA.map((f) => getEquippedBadgeObjects(f));
+  const equippedObjB = fightersB.map((f) => getEquippedBadgeObjects(f));
 
   const scoredA = fightersA.map((f, i) => ({
     fighter: f,
-    ...computeFighterScore(f, {
-      arena, twist, synergies: synergiesA, opponentFighters: fightersB,
-      badgeMultiplier: getAggregateBadgeMultiplier([fighterBadgesA[i]])
-    })
+    ...computeFighterScore(f, { arena, twist, synergies: synergiesA, opponentFighters: fightersB, equippedBadges: equippedObjA[i] })
   }));
   const scoredB = fightersB.map((f, i) => ({
     fighter: f,
-    ...computeFighterScore(f, {
-      arena, twist, synergies: synergiesB, opponentFighters: fightersA,
-      badgeMultiplier: getAggregateBadgeMultiplier([fighterBadgesB[i]])
-    })
+    ...computeFighterScore(f, { arena, twist, synergies: synergiesB, opponentFighters: fightersA, equippedBadges: equippedObjB[i] })
   }));
 
   const rawScoreA = scoredA.reduce((s, x) => s + x.score, 0) * multiplierA * teamBadgeMultiplierA;
@@ -372,7 +389,6 @@ export function runBattle({ teamA, teamB, battleMode, battleType }) {
   const loserSynergies = winnerSide === "A" ? synergiesB : synergiesA;
 
   const mvp = winnerScored.reduce((best, cur) => (cur.score > best.score ? cur : best), winnerScored[0]);
-
   const capOk = [...fightersA, ...fightersB].every((f) => f.power_point_cost <= f.power_point_cap);
 
   const whyLoserLost = buildLossReasons(loserFighters, winnerFighters, loserSynergies, winnerSynergies, arena, capOk);
@@ -392,16 +408,31 @@ export function runBattle({ teamA, teamB, battleMode, battleType }) {
   const fightSummary = `${pick(summaryOpeners)} ${winnerFighters.map((f) => f.fighter_name).join(" & ")} pulled ahead ${scoreA.toFixed(1)} to ${scoreB.toFixed(1)} on ${arena.name}.`;
   let turningPoint = pick(turningPoints);
 
-  // If a Gold-tier badge was in play on the winning side, call it out specifically.
   const winnerBadgePool = winnerSide === "A"
-    ? [...fighterBadgesA.flat(), ...teamBadgesA, ...matchupBadgesA]
-    : [...fighterBadgesB.flat(), ...teamBadgesB, ...matchupBadgesB];
+    ? [...equippedObjA.flat(), ...teamBadgesA, ...matchupBadgesA]
+    : [...equippedObjB.flat(), ...teamBadgesB, ...matchupBadgesB];
   const goldHighlight = winnerBadgePool.find((b) => b.level === "Gold");
-  if (goldHighlight) {
+  if (goldHighlight && goldHighlight.description) {
     turningPoint = `${goldHighlight.name} activated at Gold — ${goldHighlight.description.toLowerCase()}`;
   }
 
   const animationRounds = buildAnimationRounds(winnerSide, fightersA, fightersB);
+  const playOfTheMatch = findPlayOfTheMatch(animationRounds);
+
+  const breakdownA = aggregateBreakdown(scoredA);
+  const breakdownB = aggregateBreakdown(scoredB);
+  const rescale = (breakdown, fromTotal, toTotal) => {
+    const factor = fromTotal > 0 ? toTotal / fromTotal : 1;
+    return {
+      damage: breakdown.damage * factor, defense: breakdown.defense * factor,
+      support: breakdown.support * factor, tactics: breakdown.tactics * factor,
+      badges: breakdown.badges * factor
+    };
+  };
+  const fighterTotalA = scoredA.reduce((s, x) => s + x.score, 0);
+  const fighterTotalB = scoredB.reduce((s, x) => s + x.score, 0);
+  const scaledBreakdownA = rescale(breakdownA, fighterTotalA, scoreA);
+  const scaledBreakdownB = rescale(breakdownB, fighterTotalB, scoreB);
 
   return {
     fight_id: `fight_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
@@ -418,12 +449,23 @@ export function runBattle({ teamA, teamB, battleMode, battleType }) {
     mvp_reason: `Highest impact score on the winning side (${Math.round(mvp.score)} pts) this fight.`,
     active_synergies_a: synergiesA.map((s) => s.name),
     active_synergies_b: synergiesB.map((s) => s.name),
+    active_synergies_detail_a: synergiesA,
+    active_synergies_detail_b: synergiesB,
     fight_summary: fightSummary,
     turning_point: turningPoint,
     why_loser_lost: whyLoserLost,
     improvement_tips: improvementTips,
     animation_rounds: animationRounds,
+    play_of_match: playOfTheMatch,
     player_a_team_snapshot: fightersA,
-    player_b_team_snapshot: fightersB
+    player_b_team_snapshot: fightersB,
+    active_badges_a: fightersA.map((f, i) => ({ fighter_name: f.fighter_name, badges: equippedObjA[i] })),
+    active_badges_b: fightersB.map((f, i) => ({ fighter_name: f.fighter_name, badges: equippedObjB[i] })),
+    impact_breakdown_a: { ...scaledBreakdownA, total: scoreA },
+    impact_breakdown_b: { ...scaledBreakdownB, total: scoreB },
+    score_ledger_a: buildScoreLedger(scaledBreakdownA, scoreA),
+    score_ledger_b: buildScoreLedger(scaledBreakdownB, scoreB),
+    fighter_contributions_a: buildFighterContributions(scoredA),
+    fighter_contributions_b: buildFighterContributions(scoredB)
   };
 }

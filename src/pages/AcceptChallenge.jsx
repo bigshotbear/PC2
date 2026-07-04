@@ -23,7 +23,7 @@ export default function AcceptChallenge({ user, profile, challengeId, onNavigate
     })();
   }, [challengeId]);
 
-  const requiredCount = challenge ? { "1v1": 1, "2v2": 2, "3v3": 3 }[challenge.battle_size] : 1;
+  const requiredCount = challenge ? { "1v1": 1, "2v2": 2, "3v3": 3, "5v5": 5 }[challenge.battle_size] : 1;
 
   const handleFight = async () => {
     setError("");

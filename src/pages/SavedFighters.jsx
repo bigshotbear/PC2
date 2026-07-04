@@ -226,8 +226,11 @@ export default function SavedFighters({ user, profile, onNavigate }) {
                 <button className="btn btn-primary" style={{ marginBottom: 0, width: "auto", padding: "10px 14px" }} onClick={() => handleCopyCode(f)}>
                   {codeStatus === "generating" ? "Generating..." : codeStatus ? "Fight Code copied!" : "Copy Fighter Code"}
                 </button>
-                <button className="btn" style={{ marginBottom: 0, width: "auto", padding: "10px 14px" }} onClick={() => onNavigate("battleFlow", { mode: "computer", preselectedFighterId: f.id })}>
-                  Fight Now
+                <button className="btn" style={{ marginBottom: 0, width: "auto", padding: "10px 14px" }} onClick={() => onNavigate("battleFlow", { mode: "computer", singlePlayerMode: "ai", preselectedFighterId: f.id })}>
+                  Fight Now (Computer)
+                </button>
+                <button className="btn" style={{ marginBottom: 0, width: "auto", padding: "10px 14px" }} onClick={() => onNavigate("battleFlow", { mode: "computer", singlePlayerMode: "community", preselectedFighterId: f.id })}>
+                  Fight Now (Community)
                 </button>
                 <button className="btn" style={{ marginBottom: 0, width: "auto", padding: "10px 14px" }} onClick={() => onNavigate("teamBuilder")}>
                   Add to Team

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import FighterVisual from "./FighterVisual.jsx";
 
-const COUNT_BY_SIZE = { "1v1": 1, "2v2": 2, "3v3": 3 };
+const COUNT_BY_SIZE = { "1v1": 1, "2v2": 2, "3v3": 3, "5v5": 5 };
 
 /**
  * Lets the player pick exactly `count` saved fighters directly — no team

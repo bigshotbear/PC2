@@ -53,6 +53,11 @@ export default function Profile({ user, profile, onNavigate, onLogout }) {
         <div style={{ color: "var(--text-dim)", fontSize: 13 }}>{profile?.email}</div>
       </div>
 
+      <div className="card card-glow" style={{ textAlign: "center" }}>
+        <div className="card-title">Victory Ribbons</div>
+        <div className="card-value gold" style={{ fontSize: 32 }}>{profile?.total_ribbons ?? 0}</div>
+      </div>
+
       <div className="stat-grid">
         <div className="card"><div className="card-title">Wins</div><div className="card-value win">{profile?.total_wins ?? 0}</div></div>
         <div className="card"><div className="card-title">Losses</div><div className="card-value loss">{profile?.total_losses ?? 0}</div></div>

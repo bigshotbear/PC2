@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import FighterPicker from "../components/FighterPicker.jsx";
 
-const SIZES = [{ key: "1v1", count: 1 }, { key: "2v2", count: 2 }, { key: "3v3", count: 3 }];
+const SIZES = [{ key: "1v1", count: 1 }, { key: "2v2", count: 2 }, { key: "3v3", count: 3 }, { key: "5v5", count: 5 }];
 
 export default function SendChallenge({ user, friendId, friendName, onNavigate }) {
   const [battleSize, setBattleSize] = useState("1v1");
@@ -54,6 +54,7 @@ export default function SendChallenge({ user, friendId, friendName, onNavigate }
           <option value="1v1">1v1</option>
           <option value="2v2">2v2</option>
           <option value="3v3">3v3</option>
+          <option value="5v5">5v5</option>
         </select>
       </div>
 
