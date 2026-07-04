@@ -1,68 +1,30 @@
 import React from "react";
 
 const MODES = [
-  {
-    key: "story",
-    title: "Story Mode",
-    sub: "Campaign progression with your fighters",
-    soon: true
-  },
-  {
-    key: "versus",
-    title: "Versus Mode",
-    sub: "Local, Challenge Code, or Friend Battle",
-    soon: false
-  },
-  {
-    key: "vsComputer",
-    title: "VS Computer",
-    sub: "Battle an AI-generated team",
-    soon: false
-  },
-  {
-    key: "savedBuilds",
-    title: "Saved Builds",
-    sub: "Fighters and teams",
-    soon: false
-  },
-  {
-    key: "battleHistory",
-    title: "Battle History",
-    sub: "Past results and breakdowns",
-    soon: false
-  }
+  { key: "vsComputer", title: "VS Computer", sub: "Pick your fighters, fight an AI roster" },
+  { key: "fightFriend", title: "Fight a Friend", sub: "Battle a friend's fighters directly" },
+  { key: "enterCode", title: "Enter Battle Code", sub: "Send or receive a Fighter/Roster Code" },
+  { key: "story", title: "Story Mode", sub: "Pick a fighter and begin your campaign" }
 ];
 
 export default function ChooseMode({ onNavigate }) {
   const handleSelect = (mode) => {
-    if (mode.key === "savedBuilds") {
-      onNavigate("savedFighters");
-      return;
-    }
-    if (mode.key === "versus") {
-      onNavigate("versusMode");
-      return;
-    }
-    if (mode.key === "vsComputer") {
-      onNavigate("battleSetupHub", { opponentType: "computer" });
-      return;
-    }
-    if (mode.key === "battleHistory") {
-      onNavigate("battleHistory");
-      return;
-    }
-    onNavigate("comingSoon", { title: mode.title });
+    if (mode.key === "vsComputer") return onNavigate("battleFlow", { mode: "computer" });
+    if (mode.key === "fightFriend") return onNavigate("battleFlow", { mode: "friend" });
+    if (mode.key === "enterCode") return onNavigate("battleCode");
+    if (mode.key === "story") return onNavigate("storyModeSetup");
   };
 
   return (
     <div className="page">
-      <div className="topbar" style={{ position: "static", background: "none", border: "none", padding: 0, marginBottom: 20 }}>
+      <div className="topbar" style={{ position: "static", background: "none", border: "none", padding: 0, marginBottom: 16 }}>
         <button className="back-btn" onClick={() => onNavigate("dashboard")}>← Back</button>
       </div>
 
-      <h2 style={{ marginBottom: 16, color: "var(--gold-bright)", textTransform: "uppercase" }}>
-        Choose Mode
-      </h2>
+      <h2 style={{ marginBottom: 6, color: "var(--gold-bright)", textTransform: "uppercase" }}>Choose Mode</h2>
+      <div style={{ color: "var(--text-dim)", fontSize: 13, marginBottom: 16 }}>
+        Pick any saved fighter directly — a team is never required.
+      </div>
 
       <div className="mode-grid">
         {MODES.map((mode) => (
@@ -72,10 +34,13 @@ export default function ChooseMode({ onNavigate }) {
               <div className="mode-card-title">{mode.title}</div>
               <div className="mode-card-sub">{mode.sub}</div>
             </div>
-            {mode.soon && <span className="tag-soon">Coming Soon</span>}
           </button>
         ))}
       </div>
+
+      <button className="btn" style={{ marginTop: 6 }} onClick={() => onNavigate("savedFighters")}>Saved Fighters</button>
+      <button className="btn" onClick={() => onNavigate("savedTeams")}>Saved Teams (optional presets)</button>
+      <button className="btn" onClick={() => onNavigate("battleHistory")}>Battle History</button>
     </div>
   );
 }

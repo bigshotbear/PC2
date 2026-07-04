@@ -10,6 +10,11 @@ import SavedTeams from "./pages/SavedTeams.jsx";
 import VersusMode from "./pages/VersusMode.jsx";
 import Friends from "./pages/Friends.jsx";
 import BattleSetupHub from "./pages/BattleSetupHub.jsx";
+import BattleFlow from "./pages/BattleFlow.jsx";
+import BattleCode from "./pages/BattleCode.jsx";
+import SendChallenge from "./pages/SendChallenge.jsx";
+import AcceptChallenge from "./pages/AcceptChallenge.jsx";
+import StoryModeSetup from "./pages/StoryModeSetup.jsx";
 import PixelBattleAnimation from "./pages/PixelBattleAnimation.jsx";
 import BattleResult from "./pages/BattleResult.jsx";
 import BattleHistory from "./pages/BattleHistory.jsx";
@@ -155,6 +160,24 @@ export default function App() {
       {view.name === "versusMode" && <VersusMode onNavigate={navigate} />}
 
       {view.name === "friends" && <Friends user={session.user} onNavigate={navigate} />}
+
+      {view.name === "battleFlow" && (
+        <BattleFlow user={session.user} profile={profile} mode={view.params.mode} onNavigate={navigate} />
+      )}
+
+      {view.name === "battleCode" && (
+        <BattleCode user={session.user} profile={profile} onNavigate={navigate} />
+      )}
+
+      {view.name === "sendChallenge" && (
+        <SendChallenge user={session.user} friendId={view.params.friendId} friendName={view.params.friendName} onNavigate={navigate} />
+      )}
+
+      {view.name === "acceptChallenge" && (
+        <AcceptChallenge user={session.user} profile={profile} challengeId={view.params.challengeId} onNavigate={navigate} />
+      )}
+
+      {view.name === "storyModeSetup" && <StoryModeSetup user={session.user} onNavigate={navigate} />}
 
       {view.name === "battleSetupHub" && (
         <BattleSetupHub

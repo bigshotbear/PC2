@@ -10,6 +10,7 @@ export default function Friends({ user, onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [challenges, setChallenges] = useState([]);
 
   const loadFriendships = useCallback(async () => {
     setLoading(true);
@@ -36,10 +37,22 @@ export default function Friends({ user, onNavigate }) {
     setLoading(false);
   }, [user.id]);
 
+  const loadChallenges = useCallback(async () => {
+    const { data } = await supabase
+      .from("battle_challenges")
+      .select("*")
+      .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+      .order("created_at", { ascending: false });
+    setChallenges(data || []);
+  }, [user.id]);
+
   useEffect(() => {
     loadFriendships();
-  }, [loadFriendships]);
+    loadChallenges();
+  }, [loadFriendships, loadChallenges]);
 
+  // Uses the search_profiles() RPC (SECURITY DEFINER) instead of a fragile
+  // client-built .or()/ilike filter — works reliably and never exposes emails.
   const handleSearch = async (e) => {
     e.preventDefault();
     setError("");
@@ -47,13 +60,7 @@ export default function Friends({ user, onNavigate }) {
     if (!searchTerm.trim()) return;
 
     setSearching(true);
-    const { data, error: searchError } = await supabase
-      .from("profiles")
-      .select("*")
-      .or(`display_name.ilike.%${searchTerm.trim()}%,email.ilike.%${searchTerm.trim()}%`)
-      .neq("id", user.id)
-      .limit(10);
-
+    const { data, error: searchError } = await supabase.rpc("search_profiles", { search_term: searchTerm.trim() });
     setSearching(false);
 
     if (searchError) {
@@ -100,22 +107,62 @@ export default function Friends({ user, onNavigate }) {
     loadFriendships();
   };
 
+  const declineChallenge = async (id) => {
+    await supabase.from("battle_challenges").update({ status: "declined" }).eq("id", id);
+    loadChallenges();
+  };
+
   const incoming = friendships.filter((f) => f.friend_id === user.id && f.status === "pending");
   const outgoing = friendships.filter((f) => f.user_id === user.id && f.status === "pending");
   const accepted = friendships.filter((f) => f.status === "accepted");
-
   const existingRelationIds = new Set(friendships.map((f) => (f.user_id === user.id ? f.friend_id : f.user_id)));
+
+  const incomingChallenges = challenges.filter((c) => c.receiver_id === user.id && c.status === "pending");
+  const sentChallenges = challenges.filter((c) => c.sender_id === user.id);
 
   return (
     <div className="page">
       <div className="topbar" style={{ position: "static", background: "none", border: "none", padding: 0, marginBottom: 16 }}>
-        <button className="back-btn" onClick={() => onNavigate("versusMode")}>← Back</button>
+        <button className="back-btn" onClick={() => onNavigate("chooseMode")}>← Back</button>
       </div>
 
       <h2 style={{ marginBottom: 16, color: "var(--gold-bright)", textTransform: "uppercase" }}>Friends</h2>
 
       {error && <div className="error-box">{error}</div>}
       {info && <div className="success-box">{info}</div>}
+
+      {incomingChallenges.length > 0 && (
+        <div className="card card-glow">
+          <div className="card-title">Incoming Battle Challenges</div>
+          {incomingChallenges.map((c) => (
+            <div key={c.id} style={{ marginBottom: 10, borderBottom: "1px solid var(--line)", paddingBottom: 10 }}>
+              <div style={{ fontSize: 14 }}>
+                <strong>{profilesById[c.sender_id]?.display_name || "A friend"}</strong> challenged you to {c.battle_size}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button className="btn btn-primary" style={{ marginBottom: 0, width: "auto", padding: "8px 14px" }} onClick={() => onNavigate("acceptChallenge", { challengeId: c.id })}>
+                  Accept &amp; Fight
+                </button>
+                <button className="btn btn-ghost" style={{ marginBottom: 0, width: "auto", padding: "8px 14px" }} onClick={() => declineChallenge(c.id)}>
+                  Decline
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {sentChallenges.length > 0 && (
+        <div className="card">
+          <div className="card-title">Sent Challenges</div>
+          {sentChallenges.map((c) => (
+            <div key={c.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+              <span>{profilesById[c.receiver_id]?.display_name || "Friend"} · {c.battle_size}</span>
+              <span style={{ color: "var(--text-dim)" }}>{c.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <form onSubmit={handleSearch} className="card">
         <div className="field" style={{ marginBottom: 10 }}>
@@ -136,7 +183,6 @@ export default function Friends({ user, onNavigate }) {
             <div className="fighter-thumb" />
             <div className="fighter-card-body">
               <div className="fighter-card-name">{p.display_name}</div>
-              <div className="fighter-card-meta">{p.email}</div>
             </div>
             {existingRelationIds.has(p.id) ? (
               <span className="tag-soon">Already connected</span>
@@ -145,6 +191,9 @@ export default function Friends({ user, onNavigate }) {
             )}
           </div>
         ))}
+        {searchResults.length === 0 && searchTerm && !searching && (
+          <div style={{ fontSize: 13, color: "var(--text-dim)", marginTop: 8 }}>No matches yet.</div>
+        )}
       </form>
 
       {loading ? (
@@ -171,7 +220,7 @@ export default function Friends({ user, onNavigate }) {
 
           {outgoing.length > 0 && (
             <div className="card">
-              <div className="card-title">Pending (Sent)</div>
+              <div className="card-title">Sent Requests</div>
               {outgoing.map((f) => (
                 <div key={f.id} className="fighter-card" style={{ marginBottom: 8 }}>
                   <div className="fighter-thumb" />
@@ -186,7 +235,7 @@ export default function Friends({ user, onNavigate }) {
           )}
 
           <div className="card">
-            <div className="card-title">Your Friends</div>
+            <div className="card-title">Friends</div>
             {accepted.length === 0 ? (
               <div className="empty-state">
                 <div className="display">No friends yet</div>
@@ -202,7 +251,10 @@ export default function Friends({ user, onNavigate }) {
                     <div className="fighter-card-body">
                       <div className="fighter-card-name">{otherProfile?.display_name || "Unknown"}</div>
                     </div>
-                    <button className="icon-btn" onClick={() => removeFriendship(f.id)}>Remove</button>
+                    <div className="fighter-card-actions">
+                      <button className="icon-btn" title="Challenge" onClick={() => onNavigate("sendChallenge", { friendId: otherId, friendName: otherProfile?.display_name })}>⚔</button>
+                      <button className="icon-btn" title="Remove" onClick={() => removeFriendship(f.id)}>✕</button>
+                    </div>
                   </div>
                 );
               })
