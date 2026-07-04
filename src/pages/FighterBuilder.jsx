@@ -30,6 +30,7 @@ import { calculateFighterBadges, getBadgeProgress, TEAM_BADGE_INFO, MATCHUP_BADG
 import AIBuildCoach from "../components/AIBuildCoach.jsx";
 import FighterVisual from "../components/FighterVisual.jsx";
 import { reviewMatchesFighter } from "../lib/synergyReview";
+import { publishCommunityBuild } from "../lib/communityBuildService";
 
 const STAT_LABELS = {
   strength: "Strength",
@@ -78,7 +79,7 @@ function InfoNote({ children }) {
   );
 }
 
-export default function FighterBuilder({ user, fighterId, duplicateFrom, onNavigate }) {
+export default function FighterBuilder({ user, profile, fighterId, duplicateFrom, onNavigate }) {
   const [fighter, setFighter] = useState(emptyFighter);
   const [loading, setLoading] = useState(!!(fighterId || duplicateFrom));
   const [saving, setSaving] = useState(false);
@@ -205,11 +206,14 @@ export default function FighterBuilder({ user, fighterId, duplicateFrom, onNavig
       updated_at: new Date().toISOString()
     };
 
-    let saveError;
+    let saveError, savedRow;
     if (isEditing) {
       ({ error: saveError } = await supabase.from("fighters").update(payload).eq("id", fighterId));
+      savedRow = { id: fighterId, owner_id: user.id, ...payload };
     } else {
-      ({ error: saveError } = await supabase.from("fighters").insert(payload));
+      const insertResult = await supabase.from("fighters").insert(payload).select().single();
+      saveError = insertResult.error;
+      savedRow = insertResult.data;
     }
 
     setSaving(false);
@@ -217,6 +221,10 @@ export default function FighterBuilder({ user, fighterId, duplicateFrom, onNavig
     if (saveError) {
       setError("Save failed: " + saveError.message);
       return;
+    }
+
+    if (savedRow) {
+      publishCommunityBuild(savedRow, profile?.display_name).catch(() => {});
     }
 
     setSuccess(isEditing ? "Fighter updated." : "Fighter saved.");

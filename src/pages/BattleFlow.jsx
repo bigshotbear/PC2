@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import FighterPicker from "../components/FighterPicker.jsx";
+import QuickChallengeCard from "../components/QuickChallengeCard.jsx";
 import { generateComputerTeam } from "../lib/computerGenerator";
 import { executeBattle } from "../lib/battleService";
+import { getRandomCommunityBuilds, recordCommunityBuildResult } from "../lib/communityBuildService";
 
 const SIZES = [
   { key: "1v1", label: "1v1", count: 1 },
@@ -15,13 +17,17 @@ const SIZES = [
  * Fighter-first flow — a saved team is never required, only offered as
  * an optional quick-fill inside FighterPicker.
  */
-export default function BattleFlow({ user, profile, mode, onNavigate }) {
-  const [battleSize, setBattleSize] = useState(null);
-  const [myFighterIds, setMyFighterIds] = useState([]);
+export default function BattleFlow({ user, profile, mode, preselectedFighterId, onNavigate }) {
+  const [singlePlayerMode, setSinglePlayerMode] = useState(null); // "ai" | "community"
+  const [battleSize, setBattleSize] = useState(preselectedFighterId ? "1v1" : null);
+  const [myFighterIds, setMyFighterIds] = useState(preselectedFighterId ? [preselectedFighterId] : []);
   const [friends, setFriends] = useState(null);
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [friendFighterIds, setFriendFighterIds] = useState([]);
   const [cpuTeam, setCpuTeam] = useState(null);
+  const [communityBuilds, setCommunityBuilds] = useState(null);
+  const [communityError, setCommunityError] = useState("");
+  const [loadingCommunity, setLoadingCommunity] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
 
@@ -47,6 +53,15 @@ export default function BattleFlow({ user, profile, mode, onNavigate }) {
     return ids.map((id) => (data || []).find((f) => f.id === id)).filter(Boolean);
   };
 
+  const loadCommunityOpponents = async (excludeIds = []) => {
+    setCommunityError("");
+    setLoadingCommunity(true);
+    const result = await getRandomCommunityBuilds(requiredCount, excludeIds);
+    setLoadingCommunity(false);
+    if (!result.success) { setCommunityError(result.error); return; }
+    setCommunityBuilds(result.builds);
+  };
+
   const handleStart = async () => {
     setError("");
     if (myFighterIds.length !== requiredCount) { setError(`Select exactly ${requiredCount} fighter(s).`); return; }
@@ -57,9 +72,13 @@ export default function BattleFlow({ user, profile, mode, onNavigate }) {
       const myTeam = { fighter_snapshots: myFighters };
       let opponentTeam, opponentUserId = null, battleType;
 
-      if (mode === "computer") {
+      if (mode === "computer" && singlePlayerMode === "ai") {
         if (!cpuTeam) { setError("Generate an opponent first."); setStarting(false); return; }
         opponentTeam = cpuTeam;
+        battleType = "VS_COMPUTER";
+      } else if (mode === "computer" && singlePlayerMode === "community") {
+        if (!communityBuilds) { setError("Load a Community opponent first."); setStarting(false); return; }
+        opponentTeam = { fighter_snapshots: communityBuilds.map((b) => b.fighter_snapshot) };
         battleType = "VS_COMPUTER";
       } else {
         if (friendFighterIds.length !== requiredCount) { setError(`Select exactly ${requiredCount} of your friend's fighters.`); setStarting(false); return; }
@@ -72,6 +91,11 @@ export default function BattleFlow({ user, profile, mode, onNavigate }) {
       const { result, iWon } = await executeBattle({
         user, profile, myTeam, opponentTeam, battleMode: battleSize, battleType, opponentUserId
       });
+
+      if (mode === "computer" && singlePlayerMode === "community" && communityBuilds) {
+        communityBuilds.forEach((b) => recordCommunityBuildResult(b.id, !iWon));
+      }
+
       onNavigate("pixelBattleAnimation", { battleResult: result, iWon });
     } catch (e) {
       setError("Battle failed to run: " + e.message);
@@ -91,7 +115,31 @@ export default function BattleFlow({ user, profile, mode, onNavigate }) {
 
       {error && <div className="error-box">{error}</div>}
 
-      {!battleSize ? (
+      {mode === "friend" && (
+        <>
+          <QuickChallengeCard user={user} profile={profile} onNavigate={onNavigate} />
+          <div style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 12, margin: "10px 0" }}>— or challenge a friend directly —</div>
+        </>
+      )}
+
+      {mode === "computer" && !singlePlayerMode ? (
+        <div className="mode-grid">
+          <button className="card mode-card" onClick={() => setSinglePlayerMode("ai")} style={{ border: "1px solid var(--line)" }}>
+            <div className="mode-icon">🤖</div>
+            <div>
+              <div className="mode-card-title">Fight the Computer</div>
+              <div className="mode-card-sub">Battle a randomly generated AI fighter.</div>
+            </div>
+          </button>
+          <button className="card mode-card" onClick={() => setSinglePlayerMode("community")} style={{ border: "1px solid var(--line)" }}>
+            <div className="mode-icon">🌐</div>
+            <div>
+              <div className="mode-card-title">Fight Community Builds</div>
+              <div className="mode-card-sub">Battle a fighter created by another real Power Clash player.</div>
+            </div>
+          </button>
+        </div>
+      ) : !battleSize ? (
         <div className="card">
           <div className="card-title">Choose Battle Size</div>
           {SIZES.map((s) => (
@@ -105,7 +153,7 @@ export default function BattleFlow({ user, profile, mode, onNavigate }) {
             <FighterPicker userId={user.id} battleSize={battleSize} selectedIds={myFighterIds} onChange={setMyFighterIds} />
           </div>
 
-          {mode === "computer" && myFighterIds.length === requiredCount && (
+          {mode === "computer" && singlePlayerMode === "ai" && myFighterIds.length === requiredCount && (
             <div className="card">
               <div className="card-title">Opponent</div>
               <button className="btn btn-primary" onClick={() => setCpuTeam(generateComputerTeam(battleSize))}>
@@ -123,6 +171,32 @@ export default function BattleFlow({ user, profile, mode, onNavigate }) {
             </div>
           )}
 
+          {mode === "computer" && singlePlayerMode === "community" && myFighterIds.length === requiredCount && (
+            <div className="card">
+              <div className="card-title">Community Opponent</div>
+              {communityError && <div className="error-box">{communityError}</div>}
+              <button className="btn btn-primary" onClick={() => loadCommunityOpponents([])} disabled={loadingCommunity}>
+                {loadingCommunity ? "Loading..." : "Load Community Opponent"}
+              </button>
+              {communityBuilds && (
+                <>
+                  {communityBuilds.map((b) => (
+                    <div key={b.id} className="fighter-card" style={{ marginTop: 8 }}>
+                      <div className="fighter-thumb" />
+                      <div className="fighter-card-body">
+                        <div className="fighter-card-name">{b.fighter_name}</div>
+                        <div className="fighter-card-meta">by {b.owner_display_name} · {b.power_source} · {b.fighting_style}</div>
+                      </div>
+                    </div>
+                  ))}
+                  <button className="btn" onClick={() => loadCommunityOpponents(communityBuilds.map((b) => b.id))} disabled={loadingCommunity}>
+                    Find Another Opponent
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           {mode === "friend" && myFighterIds.length === requiredCount && (
             <div className="card">
               <div className="card-title">Choose a Friend</div>
@@ -131,6 +205,7 @@ export default function BattleFlow({ user, profile, mode, onNavigate }) {
               ) : friends.length === 0 ? (
                 <div className="empty-state">
                   <div className="display">No friends yet</div>
+                  <p>Friend search is currently unavailable. You can still battle instantly using a Fight Code above.</p>
                   <button className="btn" style={{ marginTop: 10 }} onClick={() => onNavigate("friends")}>Go to Friends</button>
                 </div>
               ) : (
@@ -153,9 +228,14 @@ export default function BattleFlow({ user, profile, mode, onNavigate }) {
           <button className="btn btn-primary" onClick={handleStart} disabled={starting}>
             {starting ? "Running Battle..." : "Start Battle"}
           </button>
-          <button className="btn btn-ghost" onClick={() => { setBattleSize(null); setMyFighterIds([]); setCpuTeam(null); setSelectedFriend(null); setFriendFighterIds([]); }}>
+          <button className="btn btn-ghost" onClick={() => { setBattleSize(null); setMyFighterIds([]); setCpuTeam(null); setSelectedFriend(null); setFriendFighterIds([]); setCommunityBuilds(null); setCommunityError(""); }}>
             Change Battle Size
           </button>
+          {mode === "computer" && (
+            <button className="btn btn-ghost" onClick={() => { setSinglePlayerMode(null); setBattleSize(null); setMyFighterIds([]); setCpuTeam(null); setCommunityBuilds(null); }}>
+              Change Mode
+            </button>
+          )}
         </>
       )}
     </div>

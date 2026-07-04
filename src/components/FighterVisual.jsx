@@ -72,13 +72,29 @@ export default function FighterVisual({
         <div style={{ position: "absolute", bottom: 4 * scale, right: 8 * scale, width: 44 * scale, height: 70 * scale, borderRadius: "40% 40% 12% 12%", background: "#11141c", border: `1px solid ${aura}`, opacity: 0.55 }} />
       )}
 
-      {/* 2-3. Base body + type features */}
+      {/* Custom uploaded portrait overrides the generated body, keeps aura/FX layers */}
+      {fighter.portrait_url && (
+        <img
+          src={fighter.portrait_url}
+          alt={fighter.fighter_name || "Fighter portrait"}
+          style={{
+            position: "absolute", left: "50%", bottom: 14 * scale,
+            width: type.w * scale * 1.3, height: type.h * scale * 1.3,
+            marginLeft: -(type.w * scale * 1.3) / 2,
+            objectFit: "cover", borderRadius: 14, border: "1px solid #3a4256",
+            transform: stateTransform, transition: "transform .18s ease"
+          }}
+        />
+      )}
+
+      {/* 2-3. Base body + type features (hidden when a custom portrait is set) */}
       <div style={{
         position: "absolute", left: "50%", bottom: 14 * scale,
         width: type.w * scale, height: type.h * scale,
         marginLeft: -(type.w * scale) / 2,
         borderRadius: type.r, background: type.tint,
         border: "1px solid #3a4256",
+        opacity: fighter.portrait_url ? 0 : 1,
         transform: stateTransform, transition: "transform .18s ease"
       }}>
         {/* head band / mask */}

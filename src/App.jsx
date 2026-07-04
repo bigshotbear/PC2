@@ -139,6 +139,7 @@ export default function App() {
       {view.name === "fighterBuilder" && (
         <FighterBuilder
           user={session.user}
+          profile={profile}
           fighterId={view.params.fighterId || null}
           duplicateFrom={view.params.duplicateFrom || null}
           onNavigate={navigate}
@@ -146,7 +147,7 @@ export default function App() {
       )}
 
       {view.name === "savedFighters" && (
-        <SavedFighters user={session.user} onNavigate={navigate} />
+        <SavedFighters user={session.user} profile={profile} onNavigate={navigate} />
       )}
 
       {view.name === "teamBuilder" && (
@@ -159,10 +160,10 @@ export default function App() {
 
       {view.name === "versusMode" && <VersusMode onNavigate={navigate} />}
 
-      {view.name === "friends" && <Friends user={session.user} onNavigate={navigate} />}
+      {view.name === "friends" && <Friends user={session.user} profile={profile} onNavigate={navigate} />}
 
       {view.name === "battleFlow" && (
-        <BattleFlow user={session.user} profile={profile} mode={view.params.mode} onNavigate={navigate} />
+        <BattleFlow user={session.user} profile={profile} mode={view.params.mode} preselectedFighterId={view.params.preselectedFighterId || null} onNavigate={navigate} />
       )}
 
       {view.name === "battleCode" && (

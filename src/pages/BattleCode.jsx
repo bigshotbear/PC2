@@ -1,77 +1,48 @@
 import React, { useState } from "react";
-import FighterPicker from "../components/FighterPicker.jsx";
-import { encodeFighterCode, decodeFighterCode } from "../lib/fighterCode";
-import { executeBattle } from "../lib/battleService";
 import { supabase } from "../lib/supabaseClient";
+import FighterPicker from "../components/FighterPicker.jsx";
+import QuickChallengeCard from "../components/QuickChallengeCard.jsx";
+import { createFightCode } from "../lib/fightCodeService";
 
-const SIZES = [
-  { key: "1v1", count: 1 }, { key: "2v2", count: 2 }, { key: "3v3", count: 3 }
-];
+const SIZES = [{ key: "1v1", count: 1 }, { key: "2v2", count: 2 }, { key: "3v3", count: 3 }];
 
 export default function BattleCode({ user, profile, onNavigate }) {
-  // --- Send ---
   const [sendSize, setSendSize] = useState("1v1");
   const [sendIds, setSendIds] = useState([]);
   const [generatedCode, setGeneratedCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [sendError, setSendError] = useState("");
-
-  // --- Receive ---
-  const [codeInput, setCodeInput] = useState("");
-  const [decoded, setDecoded] = useState(null);
-  const [decodeError, setDecodeError] = useState("");
-  const [myIds, setMyIds] = useState([]);
-  const [starting, setStarting] = useState(false);
 
   const requiredSendCount = SIZES.find((s) => s.key === sendSize).count;
 
   const handleGenerate = async () => {
     setSendError("");
+    setGeneratedCode("");
     if (sendIds.length !== requiredSendCount) { setSendError(`Select exactly ${requiredSendCount} fighter(s).`); return; }
+
+    setGenerating(true);
     const { data } = await supabase.from("fighters").select("*").in("id", sendIds);
     const ordered = sendIds.map((id) => (data || []).find((f) => f.id === id)).filter(Boolean);
-    setGeneratedCode(encodeFighterCode(ordered, profile?.display_name));
+
+    const codeType = ordered.length === 1 ? "fighter" : "roster";
+    const result = await createFightCode(ordered, profile?.display_name, codeType, requiredSendCount);
+    setGenerating(false);
+
+    if (!result.success) { setSendError(result.error); return; }
+    setGeneratedCode(result.code);
+    try { await navigator.clipboard.writeText(result.code); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* fallback text field still shown */ }
   };
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(generatedCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      window.prompt("Copy this code:", generatedCode);
-    }
-  };
-
-  const handleLoadChallenge = () => {
-    setDecodeError("");
-    const result = decodeFighterCode(codeInput);
-    if (!result.success) { setDecodeError(result.error); setDecoded(null); return; }
-    setDecoded(result);
-    setMyIds([]);
-  };
-
-  const requiredReceiveCount = decoded ? SIZES.find((s) => s.key === decoded.battleSize).count : 0;
-
-  const handleFight = async () => {
-    setDecodeError("");
-    if (myIds.length !== requiredReceiveCount) { setDecodeError(`Select exactly ${requiredReceiveCount} fighter(s).`); return; }
-    setStarting(true);
-    try {
-      const { data } = await supabase.from("fighters").select("*").in("id", myIds);
-      const myFighters = myIds.map((id) => (data || []).find((f) => f.id === id)).filter(Boolean);
-      const { result, iWon } = await executeBattle({
-        user, profile,
-        myTeam: { fighter_snapshots: myFighters },
-        opponentTeam: { fighter_snapshots: decoded.fighters },
-        battleMode: decoded.battleSize,
-        battleType: "PVP_CODE",
-        opponentUserId: null
-      });
-      onNavigate("pixelBattleAnimation", { battleResult: result, iWon });
-    } catch (e) {
-      setDecodeError("Battle failed to run: " + e.message);
-      setStarting(false);
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Power Clash Fight Code",
+          text: `Fight my Power Clash fighter using code: ${generatedCode}`,
+          url: window.location.origin
+        });
+      } catch { /* user cancelled share sheet */ }
     }
   };
 
@@ -94,46 +65,29 @@ export default function BattleCode({ user, profile, onNavigate }) {
           </select>
         </div>
         <FighterPicker userId={user.id} battleSize={sendSize} selectedIds={sendIds} onChange={setSendIds} />
-        <button className="btn btn-primary" onClick={handleGenerate}>Generate Code</button>
+        <button className="btn btn-primary" onClick={handleGenerate} disabled={generating}>
+          {generating ? "Generating..." : "Generate Code"}
+        </button>
 
         {generatedCode && (
           <>
-            <textarea readOnly rows={3} value={generatedCode} style={{ width: "100%", fontSize: 11, marginBottom: 8 }} />
-            <button className="btn" onClick={handleCopy}>{copied ? "Copied!" : "Copy Code"}</button>
-          </>
-        )}
-      </div>
-
-      <div className="card card-glow">
-        <div className="card-title">Receive a Challenge</div>
-        {decodeError && <div className="error-box">{decodeError}</div>}
-        <div className="field">
-          <textarea rows={3} value={codeInput} onChange={(e) => setCodeInput(e.target.value)} placeholder="Paste a PC- battle code here" />
-        </div>
-        <button className="btn" onClick={handleLoadChallenge} disabled={!codeInput.trim()}>Load Challenge</button>
-
-        {decoded && (
-          <>
-            <div className="success-box" style={{ marginTop: 10 }}>
-              Valid {decoded.battleSize} roster found from {decoded.ownerName} ({decoded.fighters.length} fighter{decoded.fighters.length > 1 ? "s" : ""}).
+            <input readOnly value={generatedCode} style={{ width: "100%", fontSize: 16, fontWeight: 700, textAlign: "center", marginBottom: 8, letterSpacing: 1 }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn" style={{ marginBottom: 0 }} onClick={async () => { try { await navigator.clipboard.writeText(generatedCode); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { window.prompt("Copy this code:", generatedCode); } }}>
+                {copied ? "Copied!" : "Copy Code"}
+              </button>
+              {navigator.share && (
+                <button className="btn" style={{ marginBottom: 0 }} onClick={handleShare}>Share</button>
+              )}
             </div>
-            {decoded.fighters.map((f, i) => (
-              <div key={i} className="fighter-card" style={{ marginBottom: 6 }}>
-                <div className="fighter-thumb" />
-                <div className="fighter-card-body">
-                  <div className="fighter-card-name">{f.fighter_name}</div>
-                  <div className="fighter-card-meta">{f.power_source} · {f.fighting_style}</div>
-                </div>
-              </div>
-            ))}
-            <div className="card-title" style={{ marginTop: 10 }}>Select Your Fighters</div>
-            <FighterPicker userId={user.id} battleSize={decoded.battleSize} selectedIds={myIds} onChange={setMyIds} />
-            <button className="btn btn-primary" onClick={handleFight} disabled={starting}>
-              {starting ? "Running Battle..." : "Fight"}
-            </button>
+            <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 8 }}>
+              This code stays active until you delete the fighter or regenerate it — it won't expire on its own.
+            </div>
           </>
         )}
       </div>
+
+      <QuickChallengeCard user={user} profile={profile} onNavigate={onNavigate} />
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
+import QuickChallengeCard from "../components/QuickChallengeCard.jsx";
 
-export default function Friends({ user, onNavigate }) {
+export default function Friends({ user, profile, onNavigate }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -192,9 +193,13 @@ export default function Friends({ user, onNavigate }) {
           </div>
         ))}
         {searchResults.length === 0 && searchTerm && !searching && (
-          <div style={{ fontSize: 13, color: "var(--text-dim)", marginTop: 8 }}>No matches yet.</div>
+          <div style={{ fontSize: 13, color: "var(--text-dim)", marginTop: 8 }}>
+            No matches yet. Friend search can be unreliable — you can still battle instantly using a Fight Code below.
+          </div>
         )}
       </form>
+
+      <QuickChallengeCard user={user} profile={profile} onNavigate={onNavigate} />
 
       {loading ? (
         <div className="center" style={{ padding: 30 }}><div className="spinner" /></div>

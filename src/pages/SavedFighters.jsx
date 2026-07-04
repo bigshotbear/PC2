@@ -1,16 +1,74 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { calculateFighterBadges } from "../lib/badgeEngine";
 import FighterVisual from "../components/FighterVisual.jsx";
+import QuickChallengeCard from "../components/QuickChallengeCard.jsx";
+import { getOrCreateFighterCode } from "../lib/fightCodeService";
+import { uploadPortrait, validateImageFile } from "../lib/portraitUploadService";
+import { publishCommunityBuild } from "../lib/communityBuildService";
 
 const LEVEL_COLORS = { Bronze: "#c17a4a", Silver: "#b7bfc9", Gold: "var(--gold-bright)" };
 
-export default function SavedFighters({ user, onNavigate }) {
+function PortraitUploader({ user, fighter, onUploaded }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+
+  const handlePick = () => inputRef.current?.click();
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setUploadError("");
+    setUploadSuccess(false);
+
+    const check = validateImageFile(file);
+    if (!check.valid) { setUploadError(check.error); return; }
+
+    setUploading(true);
+    const result = await uploadPortrait(user.id, fighter.id, file);
+    setUploading(false);
+
+    if (!result.success) { setUploadError(result.error); return; }
+
+    const { error: updateError } = await supabase.from("fighters").update({ portrait_url: result.url }).eq("id", fighter.id);
+    if (updateError) { setUploadError("Portrait uploaded but failed to save. Try again."); return; }
+
+    await publishCommunityBuild({ ...fighter, portrait_url: result.url }, undefined);
+    setUploadSuccess(true);
+    setTimeout(() => setUploadSuccess(false), 2000);
+    onUploaded(result.url);
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <div
+        onClick={handlePick}
+        title="Click to upload a custom portrait"
+        style={{ width: 64, height: 64, flexShrink: 0, overflow: "hidden", borderRadius: 10, border: "1px solid var(--line)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+      >
+        <FighterVisual fighter={fighter} size={62} />
+      </div>
+      <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: "none" }} onChange={handleFile} />
+      {uploading && <div style={{ position: "absolute", inset: 0, background: "rgba(9,11,16,0.8)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "var(--gold)" }}>Uploading...</div>}
+      {uploadError && <div style={{ position: "absolute", top: 68, left: 0, width: 160, fontSize: 10, color: "var(--loss)" }}>{uploadError}</div>}
+      {uploadSuccess && <div style={{ position: "absolute", top: 68, left: 0, width: 160, fontSize: 10, color: "var(--win)" }}>Portrait uploaded successfully.</div>}
+    </div>
+  );
+}
+
+export default function SavedFighters({ user, profile, onNavigate }) {
   const [fighters, setFighters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [codeStatusById, setCodeStatusById] = useState({});
+  const [showQuickChallenge, setShowQuickChallenge] = useState(false);
+  const [headerPicking, setHeaderPicking] = useState(false);
 
   const loadFighters = async () => {
     setLoading(true);
@@ -51,8 +109,30 @@ export default function SavedFighters({ user, onNavigate }) {
       setError("Delete failed: " + deleteError.message);
       return;
     }
+    await supabase.from("community_builds").update({ is_active: false }).eq("fighter_id", id);
     setConfirmDeleteId(null);
     setFighters((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const handleCopyCode = async (fighter) => {
+    setCodeStatusById((s) => ({ ...s, [fighter.id]: "generating" }));
+    const result = await getOrCreateFighterCode(fighter, profile?.display_name);
+    if (!result.success) {
+      setCodeStatusById((s) => ({ ...s, [fighter.id]: null }));
+      setError(result.error);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(result.code);
+    } catch {
+      window.prompt("Copy this Fight Code:", result.code);
+    }
+    setCodeStatusById((s) => ({ ...s, [fighter.id]: result.code }));
+    setTimeout(() => setCodeStatusById((s) => ({ ...s, [fighter.id]: null })), 3000);
+  };
+
+  const handlePortraitUploaded = (fighterId, url) => {
+    setFighters((prev) => prev.map((f) => (f.id === fighterId ? { ...f, portrait_url: url } : f)));
   };
 
   return (
@@ -61,9 +141,33 @@ export default function SavedFighters({ user, onNavigate }) {
         <button className="back-btn" onClick={() => onNavigate("dashboard")}>← Back</button>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <h2 style={{ color: "var(--gold-bright)", textTransform: "uppercase" }}>Saved Fighters</h2>
+      {/* --- Redesigned header: instructions + Generate Code --- */}
+      <div className="card card-glow" style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center" }}>
+        <div style={{ flex: "1 1 220px" }}>
+          <div className="card-title" style={{ marginBottom: 6 }}>How it works</div>
+          <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+            Generate a code, send it to your friend, have them send you their code, and fight!
+          </div>
+        </div>
+        <button
+          className="btn btn-primary"
+          style={{ flex: "0 0 auto", width: "auto", padding: "16px 22px", marginBottom: 0 }}
+          onClick={() => setHeaderPicking((s) => !s)}
+        >
+          Generate Code
+        </button>
       </div>
+
+      {headerPicking && (
+        <div className="card">
+          <div className="card-title">Choose a fighter to generate a code for</div>
+          {fighters.map((f) => (
+            <button key={f.id} className="btn" onClick={async () => { setHeaderPicking(false); await handleCopyCode(f); }}>
+              {f.fighter_name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <button className="btn btn-primary" onClick={() => onNavigate("fighterBuilder")}>
         + Create Fighter
@@ -90,71 +194,69 @@ export default function SavedFighters({ user, onNavigate }) {
       ) : (
         filtered.map((f) => {
           const badges = calculateFighterBadges(f, f.power_point_cost, f.power_point_cap).slice(0, 3);
+          const codeStatus = codeStatusById[f.id];
           return (
-          <div className="card fighter-card" key={f.id}>
-            <div style={{ width: 64, height: 64, flexShrink: 0, overflow: "hidden", borderRadius: 10, border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <FighterVisual fighter={f} size={62} />
-            </div>
-            <div className="fighter-card-body">
-              <div className="fighter-card-name">{f.fighter_name}</div>
-              <div className="fighter-card-meta">
-                {f.character_type} · {f.power_source} · {f.fighting_style}
+            <div className="card fighter-card" key={f.id} style={{ flexWrap: "wrap" }}>
+              <PortraitUploader user={user} fighter={f} onUploaded={(url) => handlePortraitUploaded(f.id, url)} />
+              <div className="fighter-card-body">
+                <div className="fighter-card-name">{f.fighter_name}</div>
+                <div className="fighter-card-meta">
+                  {f.character_type} · {f.power_source} · {f.fighting_style}
+                </div>
+                <div className="fighter-card-meta">
+                  Stats {f.stat_total}/100 · Power Cost {f.power_point_cost}/{f.power_point_cap}
+                </div>
+                {badges.length > 0 && (
+                  <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {badges.map((b) => (
+                      <span key={b.name} className="chip" title={b.description} style={{ borderColor: LEVEL_COLORS[b.level], color: LEVEL_COLORS[b.level], fontSize: 10 }}>
+                        {b.level === "Gold" ? "🥇" : b.level === "Silver" ? "🥈" : "🥉"} {b.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="fighter-card-meta">
-                Stats {f.stat_total}/100 · Power Cost {f.power_point_cost}/{f.power_point_cap}
+              <div className="fighter-card-actions">
+                <button className="icon-btn" title="Edit" onClick={() => onNavigate("fighterBuilder", { fighterId: f.id })}>✎</button>
+                <button className="icon-btn" title="Duplicate" onClick={() => onNavigate("fighterBuilder", { duplicateFrom: f.id })}>⧉</button>
+                <button className="icon-btn" title="Delete" onClick={() => setConfirmDeleteId(f.id)}>✕</button>
               </div>
-              {badges.length > 0 && (
-                <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                  {badges.map((b) => (
-                    <span
-                      key={b.name}
-                      className="chip"
-                      title={b.description}
-                      style={{ borderColor: LEVEL_COLORS[b.level], color: LEVEL_COLORS[b.level], fontSize: 10 }}
-                    >
-                      {b.level === "Gold" ? "🥇" : b.level === "Silver" ? "🥈" : "🥉"} {b.name}
-                    </span>
-                  ))}
+
+              <div style={{ width: "100%", display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                <button className="btn btn-primary" style={{ marginBottom: 0, width: "auto", padding: "10px 14px" }} onClick={() => handleCopyCode(f)}>
+                  {codeStatus === "generating" ? "Generating..." : codeStatus ? "Fight Code copied!" : "Copy Fighter Code"}
+                </button>
+                <button className="btn" style={{ marginBottom: 0, width: "auto", padding: "10px 14px" }} onClick={() => onNavigate("battleFlow", { mode: "computer", preselectedFighterId: f.id })}>
+                  Fight Now
+                </button>
+                <button className="btn" style={{ marginBottom: 0, width: "auto", padding: "10px 14px" }} onClick={() => onNavigate("teamBuilder")}>
+                  Add to Team
+                </button>
+              </div>
+              {codeStatus && codeStatus !== "generating" && (
+                <div style={{ width: "100%", fontSize: 12, color: "var(--gold)", marginTop: 6 }}>
+                  Code: {codeStatus} (also copied to your clipboard)
+                </div>
+              )}
+
+              {confirmDeleteId === f.id && (
+                <div style={{ position: "absolute", inset: 0, background: "rgba(9,11,16,0.92)", borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                  <div style={{ fontSize: 14 }}>Delete {f.fighter_name}?</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-danger" style={{ width: "auto", padding: "8px 16px", marginBottom: 0 }} onClick={() => handleDelete(f.id)}>Delete</button>
+                    <button className="btn btn-ghost" style={{ width: "auto", padding: "8px 16px", marginBottom: 0 }} onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                  </div>
                 </div>
               )}
             </div>
-            <div className="fighter-card-actions">
-              <button
-                className="icon-btn"
-                title="Edit"
-                onClick={() => onNavigate("fighterBuilder", { fighterId: f.id })}
-              >
-                ✎
-              </button>
-              <button
-                className="icon-btn"
-                title="Duplicate"
-                onClick={() => onNavigate("fighterBuilder", { duplicateFrom: f.id })}
-              >
-                ⧉
-              </button>
-              <button
-                className="icon-btn"
-                title="Delete"
-                onClick={() => setConfirmDeleteId(f.id)}
-              >
-                ✕
-              </button>
-            </div>
-
-            {confirmDeleteId === f.id && (
-              <div style={{ position: "absolute", inset: 0, background: "rgba(9,11,16,0.92)", borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
-                <div style={{ fontSize: 14 }}>Delete {f.fighter_name}?</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn btn-danger" style={{ width: "auto", padding: "8px 16px", marginBottom: 0 }} onClick={() => handleDelete(f.id)}>Delete</button>
-                  <button className="btn btn-ghost" style={{ width: "auto", padding: "8px 16px", marginBottom: 0 }} onClick={() => setConfirmDeleteId(null)}>Cancel</button>
-                </div>
-              </div>
-            )}
-          </div>
           );
         })
       )}
+
+      <button className="btn btn-ghost" onClick={() => setShowQuickChallenge((s) => !s)}>
+        {showQuickChallenge ? "Hide" : "Show"} Quick Challenge via Fight Code
+      </button>
+      {showQuickChallenge && <QuickChallengeCard user={user} profile={profile} onNavigate={onNavigate} />}
     </div>
   );
 }
