@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { calculateFighterBadges } from "../lib/badgeEngine";
+import FighterVisual from "../components/FighterVisual.jsx";
 
 const LEVEL_COLORS = { Bronze: "#c17a4a", Silver: "#b7bfc9", Gold: "var(--gold-bright)" };
 
@@ -91,7 +92,9 @@ export default function SavedFighters({ user, onNavigate }) {
           const badges = calculateFighterBadges(f, f.power_point_cost, f.power_point_cap).slice(0, 3);
           return (
           <div className="card fighter-card" key={f.id}>
-            <div className="fighter-thumb" />
+            <div style={{ width: 64, height: 64, flexShrink: 0, overflow: "hidden", borderRadius: 10, border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <FighterVisual fighter={f} size={62} />
+            </div>
             <div className="fighter-card-body">
               <div className="fighter-card-name">{f.fighter_name}</div>
               <div className="fighter-card-meta">

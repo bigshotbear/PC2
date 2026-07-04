@@ -149,6 +149,14 @@ function computeFighterScore(fighter, { arena, twist, synergies, opponentFighter
   // --- Badges: small, capped bonus for a well-built fighter ---
   score *= badgeMultiplier;
 
+  // --- Clash Coach creative synergy: approved reviews only, hard-capped 4% ---
+  const aiMod = Number(fighter.ai_synergy_modifier) || 0;
+  const aiReview = fighter.ai_synergy_review;
+  if (aiMod > 0 && aiReview && ["approved", "partially_approved"].includes(aiReview.status)) {
+    score *= 1 + Math.min(4, aiMod) / 100;
+    notes.push(`${aiReview.title || "Creative synergy"} activated at ${Math.min(4, aiMod)}%.`);
+  }
+
   // --- Small randomness so repeated fights vary slightly ---
   score *= rand(0.95, 1.05);
 

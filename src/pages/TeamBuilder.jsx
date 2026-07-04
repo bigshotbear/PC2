@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { buildTeamComputedFields, detectSynergies } from "../lib/teamHelpers";
 import { calculateFighterBadges, calculateTeamBadges } from "../lib/badgeEngine";
+import FighterVisual from "../components/FighterVisual.jsx";
 
 const LEVEL_COLORS = { Bronze: "#c17a4a", Silver: "#b7bfc9", Gold: "var(--gold-bright)" };
 
@@ -197,7 +198,9 @@ export default function TeamBuilder({ user, teamId, onNavigate }) {
                 }}
                 onClick={() => toggleFighter(f.id)}
               >
-                <div className="fighter-thumb" />
+                <div style={{ width: 52, height: 52, flexShrink: 0, overflow: "hidden", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <FighterVisual fighter={f} size={50} />
+                </div>
                 <div className="fighter-card-body">
                   <div className="fighter-card-name">{f.fighter_name}</div>
                   <div className="fighter-card-meta">{f.power_source} · {f.fighting_style}</div>

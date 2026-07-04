@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import FighterVisual from "../components/FighterVisual.jsx";
 
 export default function PixelBattleAnimation({ battleResult, iWon, onNavigate }) {
   const rounds = battleResult.animation_rounds || [];
@@ -78,25 +79,21 @@ export default function PixelBattleAnimation({ battleResult, iWon, onNavigate })
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 140, margin: "20px 0" }}>
-          <div
-            className="preview-silhouette"
-            style={{
-              opacity: flash === "A" ? 0.4 : 1,
-              transform: flash === "A" ? "translateX(-6px)" : "none",
-              transition: "all 0.15s ease"
-            }}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 160, margin: "16px 0" }}>
+          <FighterVisual
+            fighter={(battleResult.player_a_team_snapshot || [])[0] || {}}
+            size={140}
+            facing="right"
+            animated
+            state={finished ? (iWon ? "idle" : "defeat") : flash === "A" ? "hit" : "idle"}
           />
           <div style={{ color: "var(--gold-dim)", fontSize: 20 }}>VS</div>
-          <div
-            className="preview-silhouette"
-            style={{
-              background: "#241a1a",
-              borderColor: "#4d2c2c",
-              opacity: flash === "B" ? 0.4 : 1,
-              transform: flash === "B" ? "translateX(6px)" : "none",
-              transition: "all 0.15s ease"
-            }}
+          <FighterVisual
+            fighter={(battleResult.player_b_team_snapshot || [])[0] || {}}
+            size={140}
+            facing="left"
+            animated
+            state={finished ? (iWon ? "defeat" : "idle") : flash === "B" ? "hit" : "idle"}
           />
         </div>
 

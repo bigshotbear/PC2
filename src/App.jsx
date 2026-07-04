@@ -16,6 +16,7 @@ import BattleHistory from "./pages/BattleHistory.jsx";
 import Profile from "./pages/Profile.jsx";
 import CustomPowerJudge from "./pages/CustomPowerJudge.jsx";
 import ComingSoon from "./pages/ComingSoon.jsx";
+import BadgeGuide from "./pages/BadgeGuide.jsx";
 
 // Simple state-driven navigation. No router dependency needed since
 // this app is a single authenticated flow, not deep-linkable pages.
@@ -190,6 +191,10 @@ export default function App() {
       )}
 
       {view.name === "customPowerJudge" && <CustomPowerJudge onNavigate={navigate} />}
+
+      {view.name === "badgeGuide" && (
+        <BadgeGuide user={session.user} preselectedFighterId={view.params.fighterId || null} onNavigate={navigate} />
+      )}
 
       {view.name === "comingSoon" && (
         <ComingSoon title={view.params.title || "This feature"} onNavigate={navigate} />

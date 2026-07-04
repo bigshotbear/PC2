@@ -26,7 +26,10 @@ import {
   getSpecialSkillNote,
   nextStatBadgeHint
 } from "../lib/fighterMeta";
-import { calculateFighterBadges } from "../lib/badgeEngine";
+import { calculateFighterBadges, getBadgeProgress, TEAM_BADGE_INFO, MATCHUP_BADGE_INFO } from "../lib/badgeEngine";
+import AIBuildCoach from "../components/AIBuildCoach.jsx";
+import FighterVisual from "../components/FighterVisual.jsx";
+import { reviewMatchesFighter } from "../lib/synergyReview";
 
 const STAT_LABELS = {
   strength: "Strength",
@@ -57,43 +60,6 @@ const emptyFighter = {
   power_point_cap: POWER_POINT_CAPS["1v1"]
 };
 
-function PreviewStack({ fighter }) {
-  const showWeapon =
-    fighter.fighting_style === "Weapon Master" ||
-    fighter.special_skill === "Swordsmanship" ||
-    fighter.main_power === "Weapon Mastery" ||
-    fighter.secondary_power === "Weapon Mastery";
-
-  const auraColor = useMemo(() => {
-    const src = fighter.power_source;
-    const map = {
-      Fire: "#ff6a3d", Water: "#3da9ff", Ice: "#8fe3ff", Lightning: "#f5e14a",
-      Earth: "#a67c3d", Wind: "#c9f0d8", Light: "#fff6c9", Shadow: "#8b5cf6",
-      "Cosmic Energy": "#c084fc", Ki: "#e6b84a", Chakra: "#4ade80", Magic: "#f472b6",
-      Technology: "#38bdf8", Psychic: "#a78bfa", Nature: "#4d9e5c", Poison: "#7ee081",
-      Gravity: "#818cf8", Sound: "#fca5a5", "Spirit Energy": "#93c5fd"
-    };
-    return map[src] || "#e6b84a";
-  }, [fighter.power_source]);
-
-  return (
-    <div className="preview-stack">
-      <div className="preview-layer"><div className="preview-aura" style={{ background: auraColor }} /></div>
-      <div className="preview-layer"><div className="preview-silhouette" /></div>
-      {showWeapon && (
-        <div className="preview-layer" style={{ alignItems: "flex-end", justifyContent: "center", paddingBottom: 30 }}>
-          <div style={{ width: 4, height: 110, background: "var(--gold-bright)", borderRadius: 2, boxShadow: "0 0 10px var(--gold-bright)", transform: "rotate(18deg)" }} />
-        </div>
-      )}
-      <div className="preview-badge">
-        <span className="chip">{fighter.character_type}</span>
-        <span className="chip">{fighter.power_source}</span>
-        <span className="chip">{fighter.fighting_style}</span>
-      </div>
-    </div>
-  );
-}
-
 function InfoNote({ children }) {
   return (
     <div style={{
@@ -118,6 +84,10 @@ export default function FighterBuilder({ user, fighterId, duplicateFrom, onNavig
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [facing, setFacing] = useState("right");
+  const [showAura, setShowAura] = useState(true);
+  const [explanation, setExplanation] = useState("");
+  const [review, setReview] = useState(null);
 
   const isEditing = !!fighterId;
 
@@ -141,8 +111,10 @@ export default function FighterBuilder({ user, fighterId, duplicateFrom, onNavig
       }
 
       if (data) {
-        const { id, created_at, updated_at, owner_id, is_valid_build, stat_total, power_point_cost, ...rest } = data;
+        const { id, created_at, updated_at, owner_id, is_valid_build, stat_total, power_point_cost, synergy_explanation, ai_synergy_review, ...rest } = data;
         setFighter({ ...emptyFighter, ...rest, fighter_name: duplicateFrom ? `${rest.fighter_name} (Copy)` : rest.fighter_name });
+        setExplanation(synergy_explanation || "");
+        if (ai_synergy_review && ai_synergy_review.status) setReview(ai_synergy_review);
       }
     })();
   }, [fighterId, duplicateFrom]);
@@ -161,6 +133,11 @@ export default function FighterBuilder({ user, fighterId, duplicateFrom, onNavig
   const specialCost = fighter.special_skill && fighter.special_skill !== "None" ? 1 : 0;
 
   const badges = useMemo(() => calculateFighterBadges(fighter, powerPointCost, cap), [fighter, powerPointCost, cap]);
+  const badgeProgressList = useMemo(() => getBadgeProgress(fighter, powerPointCost, cap), [fighter, powerPointCost, cap]);
+  const almostBadges = useMemo(
+    () => badgeProgressList.filter((b) => !b.level && b.matchCount >= 1).sort((a, b) => b.matchCount - a.matchCount).slice(0, 5),
+    [badgeProgressList]
+  );
   const statGoals = useMemo(() => computeBadges(fighter, powerPointCost, cap), [fighter, powerPointCost, cap]);
   const earnedBadges = statGoals.filter((b) => b.progress >= 1);
   const closeBadges = statGoals.filter((b) => b.progress < 1 && b.progress >= 0.5).slice(0, 3);
@@ -189,6 +166,8 @@ export default function FighterBuilder({ user, fighterId, duplicateFrom, onNavig
 
     setSaving(true);
 
+    const reviewValid = review && reviewMatchesFighter(review, fighter) && ["approved", "partially_approved"].includes(review.status);
+
     const payload = {
       owner_id: user.id,
       fighter_name: fighter.fighter_name.trim(),
@@ -212,6 +191,17 @@ export default function FighterBuilder({ user, fighterId, duplicateFrom, onNavig
       power_point_cap: Number(cap),
       power_point_cost: powerPointCost,
       is_valid_build: true,
+      synergy_explanation: explanation,
+      ai_synergy_review: reviewValid ? review : {},
+      ai_synergy_modifier: reviewValid ? Math.min(4, review.modifierPercent || 0) : 0,
+      ai_synergy_updated_at: reviewValid ? new Date().toISOString() : null,
+      visual_config: {
+        characterType: fighter.character_type, fightingStyle: fighter.fighting_style,
+        powerSource: fighter.power_source, mainPower: fighter.main_power,
+        secondaryPower: fighter.secondary_power, specialSkill: fighter.special_skill,
+        ultimateMove: fighter.ultimate_move
+      },
+      visual_version: 1,
       updated_at: new Date().toISOString()
     };
 
@@ -251,35 +241,59 @@ export default function FighterBuilder({ user, fighterId, duplicateFrom, onNavig
         {isEditing ? "Edit Fighter" : "Fighter Builder"}
       </h2>
 
-      <PreviewStack fighter={fighter} />
+      <div className="preview-stack" style={{ height: 240 }}>
+        <FighterVisual fighter={fighter} size={210} facing={facing} animated showAura={showAura} />
+        <div className="preview-badge">
+          <span className="chip">{fighter.character_type}</span>
+          <span className="chip">{fighter.power_source}</span>
+          <span className="chip">{fighter.fighting_style}</span>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        <button className="btn btn-ghost" style={{ marginBottom: 0, width: "auto", padding: "10px 14px" }} onClick={() => setFacing((f) => (f === "right" ? "left" : "right"))}>↔ Flip</button>
+        <button className="btn btn-ghost" style={{ marginBottom: 0, width: "auto", padding: "10px 14px" }} onClick={() => setShowAura((a) => !a)}>{showAura ? "Hide Aura" : "Show Aura"}</button>
+      </div>
 
       {error && <div className="error-box">{error}</div>}
       {success && <div className="success-box">{success}</div>}
 
       <div className="card card-glow">
-        <div className="card-title">Badges</div>
+        <div className="card-title">Badge Tracker</div>
+        <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", marginBottom: 6 }}>Badges Earned</div>
         {badges.length === 0 ? (
-          <div style={{ fontSize: 13, color: "var(--text-dim)" }}>No badges unlocked yet.</div>
+          <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 10 }}>No badges unlocked yet.</div>
         ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
             {badges.map((b) => (
-              <span
-                key={b.name}
-                className="chip"
-                title={`${b.description} (${b.reasons.join(", ")})`}
-                style={{
-                  borderColor: b.level === "Gold" ? "var(--gold-bright)" : b.level === "Silver" ? "#b7bfc9" : "#c17a4a",
-                  color: b.level === "Gold" ? "var(--gold-bright)" : b.level === "Silver" ? "#b7bfc9" : "#c17a4a"
-                }}
-              >
+              <span key={b.name} className="chip" title={`${b.description} (${b.reasons.join(", ")})`}
+                style={{ borderColor: b.level === "Gold" ? "var(--gold-bright)" : b.level === "Silver" ? "#b7bfc9" : "#c17a4a", color: b.level === "Gold" ? "var(--gold-bright)" : b.level === "Silver" ? "#b7bfc9" : "#c17a4a" }}>
                 {b.level === "Gold" ? "🥇" : b.level === "Silver" ? "🥈" : "🥉"} {b.name}
               </span>
             ))}
           </div>
         )}
-        <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 10 }}>
-          Team and matchup badges (like Conductive Storm or Gravity Speed Killer) show up once this fighter is on a saved team and heading into a battle.
+
+        {almostBadges.length > 0 && (
+          <>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", marginBottom: 6 }}>Badges Almost Unlocked</div>
+            {almostBadges.map((b) => (
+              <div key={b.name} style={{ fontSize: 12.5, marginBottom: 6 }}>
+                <strong>{b.name}</strong> <span style={{ color: "var(--text-dim)" }}>({b.category})</span>
+                <div style={{ color: "var(--gold)" }}>→ {b.nextStep}</div>
+              </div>
+            ))}
+          </>
+        )}
+
+        <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", margin: "10px 0 6px" }}>Potential Team / Matchup Badges</div>
+        <div style={{ fontSize: 12.5, color: "var(--text-dim)", lineHeight: 1.6 }}>
+          {TEAM_BADGE_INFO.slice(0, 3).map((b) => <div key={b.name}>• <strong>{b.name}</strong> (Team): {b.requirement}</div>)}
+          {MATCHUP_BADGE_INFO.map((b) => <div key={b.name}>• <strong>{b.name}</strong> (Matchup): {b.requirement}</div>)}
         </div>
+
+        <button className="btn" style={{ marginTop: 12, marginBottom: 0 }} onClick={() => onNavigate("badgeGuide", { fighterId: fighterId || null })}>
+          View Full Badge Guide
+        </button>
       </div>
 
       {(earnedBadges.length > 0 || closeBadges.length > 0) && (
@@ -468,6 +482,14 @@ export default function FighterBuilder({ user, fighterId, duplicateFrom, onNavig
           {statTotal} / 100 — {statBannerText}
         </div>
       </div>
+
+      <AIBuildCoach
+        fighter={fighter}
+        explanation={explanation}
+        setExplanation={setExplanation}
+        review={review}
+        setReview={setReview}
+      />
 
       <button className="btn btn-primary" onClick={handleSave} disabled={saving || overCap || statTotal !== 100}>
         {saving ? "Saving..." : isEditing ? "Update Fighter" : "Save Fighter"}

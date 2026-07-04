@@ -54,6 +54,9 @@ export default function Dashboard({ profile, onNavigate, onLogout }) {
       <button className="btn" onClick={() => onNavigate("customPowerJudge")}>
         Custom Power Judge
       </button>
+      <button className="btn" onClick={() => onNavigate("badgeGuide")}>
+        Badge Guide
+      </button>
       <button className="btn" onClick={() => onNavigate("battleHistory")}>
         Battle History
       </button>

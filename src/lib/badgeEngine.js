@@ -273,3 +273,63 @@ export function getAggregateBadgeMultiplier(badgeLists) {
     .reduce((sum, b) => sum + getBadgeModifier(b.level), 0);
   return 1 + Math.min(total, MAX_TOTAL_MODIFIER);
 }
+
+// ------------------------------------------------------------
+// Single source of truth exports for Badge Guide + live tracker.
+// ------------------------------------------------------------
+export const ALL_FIGHTER_BADGES = FIGHTER_BADGES;
+
+export const TEAM_BADGE_INFO = [
+  { name: "Conductive Storm", category: "Tactical", description: "Reduces enemy effective Speed.", requirement: "Lightning + Water on the same team." },
+  { name: "Thermal Shock", category: "Attack", description: "Weakens enemy Tank/Defender Durability.", requirement: "Fire + Ice on the same team." },
+  { name: "Brain & Brawn", category: "Tactical", description: "Boosts the Brawler's effective Strength.", requirement: "Strategist/Tactician + Brawler on the same team." },
+  { name: "Vanguard Frontline", category: "Defense", description: "Adds first-wave shield protection.", requirement: "2+ Brawlers/Tanks/Defenders on the team." },
+  { name: "Team Architect", category: "Tactical", description: "Improves overall team synergy.", requirement: "3 unique styles + Team Combo Setup or Leadership." },
+  { name: "Healing Commander", category: "Tactical", description: "Improves teammate survival.", requirement: "A Support/Healer with Healing/Regeneration or Healing Burst." },
+  { name: "Source Resonance", category: "Passive", description: "Small team scaling bonus for a shared source.", requirement: "2+ fighters share a power source." }
+];
+
+export const MATCHUP_BADGE_INFO = [
+  { name: "Gravity Speed Killer", category: "Tactical", description: "Reduces enemy Speedster/Flight advantage.", requirement: "Gravity source vs. an enemy Speedster/Super Speed/Flight kit." },
+  { name: "Spirit Exorcist", category: "Tactical", description: "Counters dark/passive effects.", requirement: "Spirit Energy or Light vs. an enemy Shadow/Poison kit." }
+];
+
+/**
+ * Per-badge progress for one fighter: current level (or null),
+ * which requirement tags matched, which are missing, and exactly
+ * what the next tier needs. Powers the Badge Guide + Badge Tracker.
+ */
+export function getBadgeProgress(fighter, cost, cap) {
+  const effectiveCost = cost ?? fighter.power_point_cost ?? 0;
+  const effectiveCap = cap ?? fighter.power_point_cap ?? 10;
+
+  return FIGHTER_BADGES.map((def) => {
+    const { count, matched } = countTagMatches(fighter, def.tags);
+    let matchCount = count;
+    const specialOk = def.special ? def.special(fighter, effectiveCost, effectiveCap) : null;
+    if (specialOk) { matchCount += 1; matched.push("build condition met"); }
+
+    const missing = def.tags.filter((t) => t !== "ANY_ELEMENTAL" && !matched.includes(t));
+    const statValue = def.statKey ? Number(fighter[def.statKey]) || 0 : 999;
+    const level = getBadgeLevel(matchCount, statValue, def.statBase);
+
+    let nextStep = "";
+    if (!level) {
+      nextStep = statValue < def.statBase
+        ? `Raise ${def.statKey?.replace("_", " ")} to ${def.statBase}+ and match: ${missing.slice(0, 2).join(" or ") || "a requirement"}.`
+        : `Match one of: ${missing.slice(0, 3).join(", ")}.`;
+    } else if (level === "Bronze") {
+      nextStep = `Silver needs 2 matches + ${def.statKey?.replace("_", " ")} ${def.statBase + 5}+. Missing: ${missing.slice(0, 2).join(", ") || "raise the stat"}.`;
+    } else if (level === "Silver") {
+      nextStep = `Gold needs 3 matches + ${def.statKey?.replace("_", " ")} ${def.statBase + 10}+. Missing: ${missing.slice(0, 2).join(", ") || "raise the stat"}.`;
+    } else {
+      nextStep = "Max tier reached.";
+    }
+
+    return {
+      name: def.name, category: def.category, description: def.effect,
+      level, matched, missing, statKey: def.statKey, statValue,
+      statBase: def.statBase, nextStep, matchCount
+    };
+  });
+}
