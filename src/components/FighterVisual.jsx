@@ -38,7 +38,7 @@ export default function FighterVisual({
   state = "idle"
 }) {
   const type = TYPE_SHAPES[fighter.character_type] || TYPE_SHAPES["Hero"];
-  const aura = AURA_COLORS[fighter.power_source] || "#e6b84a";
+  const aura = fighter.visual_config?.auraColor || AURA_COLORS[fighter.power_source] || "#e6b84a";
   const pose = resolvePose(fighter);
   const mainFx = POWER_FX[fighter.main_power];
   const secFx = POWER_FX[fighter.secondary_power];
