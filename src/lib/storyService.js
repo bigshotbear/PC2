@@ -121,5 +121,8 @@ export async function upgradeAbility(userId, fighterId, abilityKey) {
 }
 
 export async function beginFirstRun(progressId, currentAttempts) {
-  return updateStoryProgress(progressId, { run_status: "active", current_level: 1, total_attempts: (currentAttempts || 0) + 1 });
+  return updateStoryProgress(progressId, {
+    run_status: "active", current_level: 1, total_attempts: (currentAttempts || 0) + 1,
+    wins_this_run: 0, losses_this_run: 0, completed_bosses: []
+  });
 }

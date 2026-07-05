@@ -4,6 +4,7 @@ import FighterVisual from "../components/FighterVisual.jsx";
 import { getOrCreateStoryProgress, getUnlockedAbilities, beginFirstRun } from "../lib/storyService";
 import { computeEffectiveStats } from "../lib/storyEngine";
 import { getAbilityByKey } from "../lib/storyBosses";
+import StoryRunSummary from "../components/StoryRunSummary.jsx";
 
 export default function StoryHome({ user, onNavigate }) {
   const [fighters, setFighters] = useState([]);
@@ -124,6 +125,8 @@ export default function StoryHome({ user, onNavigate }) {
                 })}
                 <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>{unlockedAbilities.length} abilities unlocked total.</div>
               </div>
+
+              <StoryRunSummary progress={progress} unlockedAbilities={unlockedAbilities} onReset={() => window.location.reload()} />
 
               <button className="btn" onClick={() => onNavigate("storyBossIntel", { fighterId })}>Boss Intel</button>
               <button className="btn" onClick={() => onNavigate("storyAbilityArchive", { fighterId })}>Ability Archive</button>

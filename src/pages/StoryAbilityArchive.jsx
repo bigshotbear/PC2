@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getAbilityByKey } from "../lib/storyBosses";
+import { getAbilityByKey, ALL_STORY_ABILITIES } from "../lib/storyBosses";
 import { getOrCreateStoryProgress, getUnlockedAbilities, updateStoryProgress } from "../lib/storyService";
 
 export default function StoryAbilityArchive({ user, fighterId, onNavigate }) {
@@ -77,6 +77,9 @@ export default function StoryAbilityArchive({ user, fighterId, onNavigate }) {
                 <span style={{ fontSize: 12, color: "var(--text-dim)" }}>Lvl {u.upgrade_level}/3</span>
               </div>
               <div style={{ fontSize: 12.5, color: "var(--text-dim)", marginBottom: 6 }}>{ability?.desc}</div>
+              <div style={{ fontSize: 11, color: "var(--gold)", marginBottom: 6 }}>
+                {u.upgrade_level < 3 ? `Next level: stronger effect and improved visual.` : "Max level reached."}
+              </div>
               <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 8 }}>From: {ability?.source_boss_name}</div>
               <button className={`btn ${isEquipped ? "btn-danger" : "btn-primary"}`} style={{ marginBottom: 0 }} onClick={() => toggleEquip(u.ability_key)}>
                 {isEquipped ? "Unequip" : "Equip"}
@@ -85,6 +88,15 @@ export default function StoryAbilityArchive({ user, fighterId, onNavigate }) {
           );
         })
       )}
+
+      <div className="card">
+        <div className="card-title">Locked Abilities</div>
+        {ALL_STORY_ABILITIES.filter((a) => !unlocked.some((u) => u.ability_key === a.key)).map((a) => (
+          <div key={a.key} style={{ fontSize: 13, marginBottom: 6, color: "var(--text-dim)" }}>
+            🔒 <strong>{a.name}</strong> — defeat {a.source_boss_name} and choose "Take an Ability" to unlock.
+          </div>
+        ))}
+      </div>
 
       <button className="btn btn-primary" onClick={handleSave}>Save &amp; Return</button>
     </div>

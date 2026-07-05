@@ -1,20 +1,27 @@
 import React, { useEffect, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
 import { getAbilityByKey } from "../lib/storyBosses";
+import { computeEffectiveStats } from "../lib/storyEngine";
 import { getOrCreateStoryProgress, getUnlockedAbilities, upgradeAbility, updateStoryProgress } from "../lib/storyService";
+import StoryRunSummary from "../components/StoryRunSummary.jsx";
 
 const STAT_LABELS = { strength: "Strength", speed: "Speed", durability: "Durability", battle_iq: "Battle IQ", stamina: "Stamina" };
 
 export default function StoryTraining({ user, fighterId, onNavigate }) {
+  const [fighter, setFighter] = useState(null);
   const [progress, setProgress] = useState(null);
   const [unlocked, setUnlocked] = useState([]);
   const [mode, setMode] = useState(null);
   const [points, setPoints] = useState({ strength: 0, speed: 0, durability: 0, battle_iq: 0, stamina: 0 });
   const [claimed, setClaimed] = useState(false);
+  const [claimSummary, setClaimSummary] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     (async () => {
+      const { data: f } = await supabase.from("fighters").select("*").eq("id", fighterId).single();
+      setFighter(f);
       const p = await getOrCreateStoryProgress(user.id, fighterId);
       setProgress(p);
       const u = await getUnlockedAbilities(user.id, fighterId);
@@ -22,7 +29,9 @@ export default function StoryTraining({ user, fighterId, onNavigate }) {
     })();
   }, [user.id, fighterId]);
 
-  if (!progress) return <div className="page center" style={{ minHeight: "60vh" }}><div className="spinner" /></div>;
+  const resetPoints = () => setPoints({ strength: 0, speed: 0, durability: 0, battle_iq: 0, stamina: 0 });
+
+  if (!progress || !fighter) return <div className="page center" style={{ minHeight: "60vh" }}><div className="spinner" /></div>;
 
   const alreadyClaimed = progress.run_status !== "pending_training";
   const remaining = 2 - Object.values(points).reduce((s, v) => s + v, 0);
@@ -45,6 +54,10 @@ export default function StoryTraining({ user, fighterId, onNavigate }) {
     if (remaining !== 0) { setError("Assign both points before continuing."); return; }
     setSaving(true);
     try {
+      const eff = computeEffectiveStats(fighter, progress);
+      const changed = Object.entries(points).filter(([, v]) => v > 0)
+        .map(([key, v]) => `${STAT_LABELS[key]} increased from ${eff[key]} to ${eff[key] + v}`);
+      setClaimSummary(changed.join(". "));
       await finish({
         strength_bonus: (progress.strength_bonus || 0) + points.strength,
         speed_bonus: (progress.speed_bonus || 0) + points.speed,
@@ -62,6 +75,9 @@ export default function StoryTraining({ user, fighterId, onNavigate }) {
     setSaving(true);
     try {
       await upgradeAbility(user.id, fighterId, abilityKey);
+      const ability = getAbilityByKey(abilityKey);
+      const current = unlocked.find((u) => u.ability_key === abilityKey);
+      setClaimSummary(`${ability?.name} upgraded to Level ${Math.min(3, (current?.upgrade_level || 1) + 1)}`);
       await finish();
     } catch (e) {
       setError(e.message);
@@ -70,7 +86,10 @@ export default function StoryTraining({ user, fighterId, onNavigate }) {
   };
 
   const handleBeginNewRun = async () => {
-    await updateStoryProgress(progress.id, { run_status: "active", current_level: 1, total_attempts: (progress.total_attempts || 0) + 1 });
+    await updateStoryProgress(progress.id, {
+      run_status: "active", current_level: 1, total_attempts: (progress.total_attempts || 0) + 1,
+      wins_this_run: 0, losses_this_run: 0, completed_bosses: []
+    });
     onNavigate("storyLevel", { fighterId });
   };
 
@@ -83,9 +102,11 @@ export default function StoryTraining({ user, fighterId, onNavigate }) {
 
       {error && <div className="error-box">{error}</div>}
 
+      <StoryRunSummary progress={progress} unlockedAbilities={unlocked} />
+
       {claimed || alreadyClaimed ? (
         <>
-          <div className="success-box">Training reward applied.</div>
+          <div className="success-box">Training saved.{claimSummary ? ` ${claimSummary}.` : ""}</div>
           <button className="btn btn-primary" onClick={handleBeginNewRun}>Begin New Run</button>
         </>
       ) : !mode ? (
@@ -102,17 +123,23 @@ export default function StoryTraining({ user, fighterId, onNavigate }) {
       ) : mode === "points" ? (
         <div className="card">
           <div className="card-title">Distribute 2 Points — {remaining} remaining</div>
-          {Object.keys(STAT_LABELS).map((key) => (
-            <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span>{STAT_LABELS[key]}</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button className="icon-btn" onClick={() => adjustPoint(key, -1)}>−</button>
-                <span style={{ width: 20, textAlign: "center" }}>{points[key]}</span>
-                <button className="icon-btn" onClick={() => adjustPoint(key, 1)}>+</button>
+          {Object.keys(STAT_LABELS).map((key) => {
+            const eff = computeEffectiveStats(fighter, progress);
+            const before = eff[key];
+            const after = before + points[key];
+            return (
+              <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span>{STAT_LABELS[key]}: {before}{points[key] > 0 ? ` → ${after}` : ""}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button className="icon-btn" onClick={() => adjustPoint(key, -1)}>−</button>
+                  <span style={{ width: 20, textAlign: "center" }}>{points[key]}</span>
+                  <button className="icon-btn" onClick={() => adjustPoint(key, 1)}>+</button>
+                </div>
               </div>
-            </div>
-          ))}
-          <button className="btn btn-primary" onClick={handleTakePoints} disabled={saving || remaining !== 0}>Confirm Points</button>
+            );
+          })}
+          <button className="btn btn-primary" onClick={handleTakePoints} disabled={saving || remaining !== 0}>Confirm Training</button>
+          <button className="btn btn-ghost" onClick={resetPoints}>Reset Points</button>
           <button className="btn btn-ghost" onClick={() => setMode(null)}>Back</button>
         </div>
       ) : (
