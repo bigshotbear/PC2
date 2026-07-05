@@ -57,9 +57,13 @@ export default function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  const [profileError, setProfileError] = useState("");
+  const [stuckLoading, setStuckLoading] = useState(false);
+
   // ---- Profile load / auto-create ----
   const loadProfile = useCallback(async (user) => {
     if (!user) return;
+    setProfileError("");
 
     const { data: existing, error: fetchError } = await supabase
       .from("profiles")
@@ -69,6 +73,7 @@ export default function App() {
 
     if (fetchError) {
       console.error("Failed to load profile:", fetchError.message);
+      setProfileError("Could not load your profile: " + fetchError.message);
       return;
     }
 
@@ -115,6 +120,7 @@ export default function App() {
 
     if (insertError) {
       console.error("Failed to create profile:", insertError.message);
+      setProfileError("Could not set up your profile: " + insertError.message);
       return;
     }
 
@@ -126,6 +132,12 @@ export default function App() {
       loadProfile(session.user);
     }
   }, [session, loadProfile]);
+
+  useEffect(() => {
+    if (!session?.user || profile) { setStuckLoading(false); return; }
+    const timer = setTimeout(() => setStuckLoading(true), 6000);
+    return () => clearTimeout(timer);
+  }, [session, profile]);
 
   const navigate = (name, params = {}) => {
     setView({ name, params });
@@ -151,8 +163,28 @@ export default function App() {
     return <Auth />;
   }
 
+  if (profileError && !profile) {
+    return (
+      <div className="page center" style={{ minHeight: "100vh", flexDirection: "column", gap: 14, maxWidth: 400 }}>
+        <div className="error-box">{profileError}</div>
+        <button className="btn btn-primary" onClick={() => loadProfile(session.user)}>Retry</button>
+        <button className="btn btn-ghost" onClick={handleLogout}>Log Out</button>
+      </div>
+    );
+  }
+
+  if (stuckLoading && !profile) {
+    return (
+      <div className="page center" style={{ minHeight: "100vh", flexDirection: "column", gap: 14, maxWidth: 400 }}>
+        <div style={{ color: "var(--text-dim)", textAlign: "center" }}>This is taking longer than expected.</div>
+        <button className="btn btn-primary" onClick={() => loadProfile(session.user)}>Retry</button>
+        <button className="btn btn-ghost" onClick={handleLogout}>Log Out</button>
+      </div>
+    );
+  }
+
   if (profile && !profile.display_name) {
-    return <ChooseDisplayName user={session.user} onDone={() => loadProfile(session.user)} />;
+    return <ChooseDisplayName user={session.user} onDone={() => window.location.reload()} />;
   }
 
   // Authenticated — route between pages via lightweight state machine.

@@ -17,7 +17,7 @@ function synthesizeHealthTimeline(won, margin) {
 }
 
 /** Never throws — always returns a usable, validated judgment. */
-export async function judgeStoryBattleSafe({ fighter, progress, boss, equippedAbilities, planText }) {
+export async function judgeStoryBattleSafe({ fighter, progress, boss, equippedAbilities, planText, timesDefeated = 0 }) {
   try {
     const effectiveStats = computeEffectiveStats(fighter, progress);
     const { data, error } = await supabase.functions.invoke("judge-story-battle", {
@@ -34,5 +34,5 @@ export async function judgeStoryBattleSafe({ fighter, progress, boss, equippedAb
   } catch (e) {
     // fall through to local referee
   }
-  return judgeStoryBattle({ fighter, progress, boss, equippedAbilities, planText });
+  return judgeStoryBattle({ fighter, progress, boss, equippedAbilities, planText, timesDefeated });
 }

@@ -92,7 +92,8 @@ export default function StoryLevel({ user, fighterId, onNavigate }) {
     setPhaseIndex(0);
 
     const result = await judgeStoryBattleSafe({
-      fighter, progress, boss, equippedAbilities: equippedAbilityObjs, planText: finalPlan
+      fighter, progress, boss, equippedAbilities: equippedAbilityObjs, planText: finalPlan,
+      timesDefeated: bossProgress?.times_defeated || 0
     });
 
     const memory = await recordBossResult(
@@ -176,6 +177,12 @@ export default function StoryLevel({ user, fighterId, onNavigate }) {
           <div className={`card-value ${judgment.won ? "win" : "loss"}`} style={{ fontSize: 28 }}>{judgment.won ? "VICTORY" : "DEFEAT"}</div>
           <div style={{ fontSize: 20, color: "var(--gold-bright)", marginTop: 6 }}>Grade: {judgment.grade}</div>
           <div style={{ fontSize: 13, color: "var(--text-dim)", marginTop: 6 }}>{fighter.fighter_name} {judgment.playerScore} — {judgment.opponentScore} {boss.name}</div>
+          <div style={{ fontSize: 15, marginTop: 10, fontWeight: 600 }}>{judgment.plainSummary}</div>
+          {judgment.masteryBonus > 0 && (
+            <div style={{ fontSize: 11, color: "var(--gold)", marginTop: 6 }}>
+              +{judgment.masteryBonus} experience bonus from {bossProgress?.times_defeated || 0} prior win{(bossProgress?.times_defeated || 0) === 1 ? "" : "s"} against {boss.name}
+            </div>
+          )}
         </div>
 
         <div className="card">

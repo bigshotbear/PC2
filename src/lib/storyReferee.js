@@ -105,6 +105,23 @@ function scoreArena(fighter, boss, arena) {
   return { score: Math.max(0, Math.min(100, score)), effects };
 }
 
+const PLAIN_PHRASES = {
+  strength: { lack: "wasn't strong enough", win: "Your raw Strength carried the fight." },
+  speed: { lack: "wasn't fast enough", win: "Your Speed made the difference." },
+  durability: { lack: "wasn't durable enough", win: "Your Durability held up when it mattered." },
+  battle_iq: { lack: "wasn't smart enough about the matchup", win: "Your Battle IQ read the fight correctly." },
+  stamina: { lack: "ran out of gas", win: "Your Stamina let you outlast them." }
+};
+
+function buildPlainSummary(won, biggestPlayerAdvantage, biggestOpponentAdvantage) {
+  if (won) {
+    if (biggestPlayerAdvantage) return PLAIN_PHRASES[biggestPlayerAdvantage]?.win || "Your build was simply better suited for this fight.";
+    return "A close fight, but you came out on top.";
+  }
+  if (biggestOpponentAdvantage) return `Simply put: you ${PLAIN_PHRASES[biggestOpponentAdvantage]?.lack || "were outmatched"} this time.`;
+  return "A close fight — no single stat decided it.";
+}
+
 function gradeFromMargin(won, margin, strategyScore) {
   if (!won) return margin < 8 ? "D" : "F";
   if (margin > 25 && strategyScore > 80) return "S";
@@ -127,7 +144,7 @@ function buildHealthTimeline(won, margin) {
   return timeline;
 }
 
-export function judgeStoryBattle({ fighter, progress, boss, equippedAbilities, planText }) {
+export function judgeStoryBattle({ fighter, progress, boss, equippedAbilities, planText, timesDefeated = 0 }) {
   const playerStats = computeEffectiveStats(fighter, progress);
   const arena = pick(ARENAS);
   const twist = pick(BATTLE_TWISTS);
@@ -139,13 +156,19 @@ export function judgeStoryBattle({ fighter, progress, boss, equippedAbilities, p
   const arenaResult = scoreArena(fighter, boss, arena);
   const uncertainty = rand(-3, 3);
 
+  // Mastery: every prior victory over THIS specific boss represents real
+  // learned experience, not just stat growth (which is already captured in
+  // the 30% stats/build weight). Small, capped — never a guaranteed win.
+  const masteryBonus = Math.min(15, timesDefeated * 3);
+
   const playerComposite =
     statResult.score * 0.30 +
     matchupResult.score * 0.25 +
     strategyResult.score * 0.25 +
     (100 - opponentAIScore) * 0.10 +
     arenaResult.score * 0.07 +
-    (50 + uncertainty) * 0.03;
+    (50 + uncertainty) * 0.03 +
+    masteryBonus;
 
   const opponentComposite = 100 - playerComposite + (uncertainty * 0.03);
 
@@ -159,6 +182,11 @@ export function judgeStoryBattle({ fighter, progress, boss, equippedAbilities, p
 
   const biggestPlayerAdvantage = statResult.advantages.filter((a) => a.favors === "player").sort((a, b) => b.diff - a.diff)[0];
   const biggestOpponentAdvantage = statResult.advantages.filter((a) => a.favors === "opponent").sort((a, b) => a.diff - b.diff)[0];
+  const plainSummary = buildPlainSummary(
+    won,
+    biggestPlayerAdvantage ? biggestPlayerAdvantage.stat : null,
+    biggestOpponentAdvantage ? biggestOpponentAdvantage.stat : null
+  );
 
   const turningPoint = won
     ? (matchupResult.abilityInteractions[0] || matchupResult.interactions[0] || strategyResult.strengths[0] || "Your build's overall edge carried the fight.")
@@ -191,7 +219,9 @@ export function judgeStoryBattle({ fighter, progress, boss, equippedAbilities, p
     biggestOpponentAdvantage: biggestOpponentAdvantage ? biggestOpponentAdvantage.stat : null,
     playerEffectiveStats: playerStats,
     margin: Math.round(margin),
-    healthTimeline: buildHealthTimeline(won, margin)
+    healthTimeline: buildHealthTimeline(won, margin),
+    plainSummary,
+    masteryBonus
   };
 }
 
