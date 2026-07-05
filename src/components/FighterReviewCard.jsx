@@ -23,7 +23,7 @@ export default function FighterReviewCard({ fighter, statTotal, powerPointCost, 
         </div>
       </div>
 
-      <StatDonutChart stats={{ strength: fighter.strength, speed: fighter.speed, durability: fighter.durability, battle_iq: fighter.battle_iq, stamina: fighter.stamina }} />
+      <StatDonutChart fighter={fighter} stats={{ strength: fighter.strength, speed: fighter.speed, durability: fighter.durability, battle_iq: fighter.battle_iq, stamina: fighter.stamina }} />
 
       <div className="card">
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>

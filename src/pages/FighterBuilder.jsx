@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import {
   CHARACTER_TYPES, FIGHTING_STYLES, POWER_SOURCES, POWERS, SPECIAL_SKILLS,
-  WEAKNESSES, ULTIMATES, POWER_LEVELS, ULTIMATE_LEVELS, POWER_POINT_CAPS, STAT_KEYS,
+  WEAKNESSES, ULTIMATES, POWER_LEVELS, ULTIMATE_LEVELS, STAT_KEYS,
   calcStatTotal, calcPowerPointCost, validateFighter
 } from "../lib/fighterOptions";
 import {
@@ -12,9 +12,11 @@ import {
 import { calculateFighterBadges } from "../lib/badgeEngine";
 import { reviewMatchesFighter } from "../lib/synergyReview";
 import { publishCommunityBuild } from "../lib/communityBuildService";
+import { randomizeFighterFields } from "../lib/randomizeFighter";
 
 import BuilderProgress from "../components/BuilderProgress.jsx";
-import ChoiceCard from "../components/ChoiceCard.jsx";
+import CompactSelectionBox from "../components/CompactSelectionBox.jsx";
+import FullScreenOptionPicker from "../components/FullScreenOptionPicker.jsx";
 import DetailsDrawer from "../components/DetailsDrawer.jsx";
 import FighterPreview from "../components/FighterPreview.jsx";
 import BuildSummary from "../components/BuildSummary.jsx";
@@ -25,9 +27,11 @@ import StatDonutChart from "../components/StatDonutChart.jsx";
 import HelpGuideModal from "../components/HelpGuideModal.jsx";
 import FighterReviewCard from "../components/FighterReviewCard.jsx";
 import AIBuildCoach from "../components/AIBuildCoach.jsx";
+import InspirationPickerModal from "../components/InspirationPickerModal.jsx";
 
 const STAT_LABELS = { strength: "Strength", speed: "Speed", durability: "Durability", battle_iq: "Battle IQ", stamina: "Stamina" };
 const AURA_SWATCHES = ["#e6b84a", "#ff6a3d", "#3da9ff", "#8b5cf6", "#4ade80", "#f472b6", "#38bdf8", "#ff5468"];
+const POWER_CAP = 10;
 
 const STYLE_BEST = {
   Brawler: "Strength, Durability, Stamina", Assassin: "Speed, Battle IQ", Tank: "Durability, Stamina",
@@ -48,7 +52,7 @@ const emptyFighter = {
   main_power: POWERS[0], main_power_level: 1, secondary_power: POWERS[1], secondary_power_level: 1,
   special_skill: SPECIAL_SKILLS[0], weakness: WEAKNESSES[0], ultimate_move: ULTIMATES[0], ultimate_level: 1,
   strength: 20, speed: 20, durability: 20, battle_iq: 20, stamina: 20,
-  power_point_cap: POWER_POINT_CAPS["1v1"], visual_config: {}
+  power_point_cap: POWER_CAP, visual_config: {}
 };
 
 export default function FighterBuilder({ user, profile, fighterId, duplicateFrom, onNavigate }) {
@@ -64,6 +68,8 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
   const [details, setDetails] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showSummaryMobile, setShowSummaryMobile] = useState(false);
+  const [showInspiration, setShowInspiration] = useState(false);
+  const [openPicker, setOpenPicker] = useState(null);
 
   const [explanation, setExplanation] = useState("");
   const [review, setReview] = useState(null);
@@ -80,7 +86,7 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
       if (loadError) { setError("Could not load fighter: " + loadError.message); return; }
       if (data) {
         const { id, created_at, updated_at, owner_id, is_valid_build, stat_total, power_point_cost, synergy_explanation, ai_synergy_review, ...rest } = data;
-        setFighter({ ...emptyFighter, ...rest, fighter_name: duplicateFrom ? `${rest.fighter_name} (Copy)` : rest.fighter_name });
+        setFighter({ ...emptyFighter, ...rest, power_point_cap: POWER_CAP, fighter_name: duplicateFrom ? `${rest.fighter_name} (Copy)` : rest.fighter_name });
         setExplanation(synergy_explanation || "");
         if (ai_synergy_review && ai_synergy_review.status) setReview(ai_synergy_review);
       }
@@ -92,7 +98,7 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
 
   const statTotal = calcStatTotal(fighter);
   const powerPointCost = calcPowerPointCost(fighter);
-  const cap = fighter.power_point_cap;
+  const cap = POWER_CAP;
   const overCap = powerPointCost > cap;
 
   const badges = useMemo(() => calculateFighterBadges(fighter, powerPointCost, cap), [fighter, powerPointCost, cap]);
@@ -116,10 +122,19 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
   const goNext = () => setStep((s) => Math.min(4, s + 1));
   const goBack = () => setStep((s) => Math.max(0, s - 1));
 
+  const handleApplyPreset = (preset) => {
+    setFighter((f) => ({ ...f, ...preset.build, ...preset.stats, fighter_name: f.fighter_name || preset.name }));
+    setShowInspiration(false);
+  };
+
+  const handleRandomize = () => {
+    setFighter((f) => ({ ...f, ...randomizeFighterFields() }));
+  };
+
   const handleSave = async (andFight = false) => {
     setError("");
     setSuccess("");
-    const { isValid, errors } = validateFighter(fighter);
+    const { isValid, errors } = validateFighter({ ...fighter, power_point_cap: cap });
     if (!isValid) { setError(errors.join(" ")); setStep(2); return; }
 
     setSaving(true);
@@ -141,7 +156,7 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
       ultimate_level: Number(fighter.ultimate_level),
       strength: Number(fighter.strength), speed: Number(fighter.speed), durability: Number(fighter.durability),
       battle_iq: Number(fighter.battle_iq), stamina: Number(fighter.stamina),
-      stat_total: statTotal, power_point_cap: Number(cap), power_point_cost: powerPointCost,
+      stat_total: statTotal, power_point_cap: cap, power_point_cost: powerPointCost,
       is_valid_build: true,
       synergy_explanation: explanation,
       ai_synergy_review: reviewValid ? review : {},
@@ -185,12 +200,7 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
           <h2 style={{ color: "var(--gold-bright)", textTransform: "uppercase", marginBottom: 10 }}>Build Your Fighter</h2>
           <p style={{ fontSize: 14, lineHeight: 1.7 }}>
             Build your fighter in five easy steps.<br /><br />
-            You will choose:<br />
-            • Who they are<br />
-            • How they fight<br />
-            • What powers they use<br />
-            • Their strengths and weaknesses<br />
-            • How they look<br /><br />
+            You will choose:<br />• Who they are<br />• How they fight<br />• What powers they use<br />• Their strengths and weaknesses<br />• How they look<br /><br />
             You can change anything before saving.
           </p>
         </div>
@@ -208,14 +218,24 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
 
   const guided = builderMode !== "quick";
 
+  const characterTypeOptions = CHARACTER_TYPES.map((t) => {
+    const info = CHARACTER_TYPE_INFO[t];
+    return { key: t, title: t, tagline: info?.blurb, best: info?.perk, onDetails: () => setDetails({ title: t, body: <div>{info?.blurb} {info?.perk}</div> }) };
+  });
+  const fightingStyleOptions = FIGHTING_STYLES.map((s) => {
+    const info = FIGHTING_STYLE_INFO[s];
+    return {
+      key: s, title: s, tagline: info?.pro, best: STYLE_BEST[s], watch: STYLE_WATCH[s],
+      onDetails: () => setDetails({ title: s, body: <div><strong>Pro:</strong> {info?.pro}<br /><strong>Con:</strong> {info?.con}<br /><strong>Pairs well with:</strong> {info?.pairsWith}</div> })
+    };
+  });
+
   return (
-    <div className="page">
+    <div className="page" style={{ paddingBottom: 90 }}>
       <div className="topbar" style={{ position: "static", background: "none", border: "none", padding: 0, marginBottom: 12 }}>
         <button className="back-btn" onClick={() => onNavigate("dashboard")}>← Back</button>
         <div style={{ display: "flex", gap: 6 }}>
-          <button className="chip" style={{ cursor: "pointer" }} onClick={() => setBuilderMode(guided ? "quick" : "guided")}>
-            {guided ? "Guided" : "Quick"} Build
-          </button>
+          <button className="chip" style={{ cursor: "pointer" }} onClick={() => setBuilderMode(guided ? "quick" : "guided")}>{guided ? "Guided" : "Quick"} Build</button>
           <button className="chip" style={{ cursor: "pointer", borderColor: "#c084fc", color: "#c084fc" }} onClick={() => setShowHelp(true)}>Help</button>
         </div>
       </div>
@@ -227,15 +247,16 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
 
       <FighterPreview fighter={fighter} />
 
-      <button className="btn btn-ghost" onClick={() => setShowSummaryMobile((s) => !s)}>
-        {showSummaryMobile ? "Hide" : "View"} Build Summary
-      </button>
-      {showSummaryMobile && (
-        <BuildSummary fighter={fighter} statTotal={statTotal} powerPointCost={powerPointCost} cap={cap} badges={badges} almostBadges={almostBadges} />
-      )}
+      <button className="btn btn-ghost" onClick={() => setShowSummaryMobile((s) => !s)}>{showSummaryMobile ? "Hide" : "View"} Build Summary</button>
+      {showSummaryMobile && <BuildSummary fighter={fighter} statTotal={statTotal} powerPointCost={powerPointCost} cap={cap} badges={badges} almostBadges={almostBadges} />}
 
       {step === 0 && (
         <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+            <button className="btn" style={{ marginBottom: 8 }} onClick={() => setShowInspiration(true)}>✨ Use Inspiration Archetype</button>
+            <button className="btn" style={{ marginBottom: 8 }} onClick={handleRandomize}>🎲 Randomize My Fighter</button>
+          </div>
+
           <div className="card">
             <div className="field">
               <label>Fighter Name</label>
@@ -243,31 +264,9 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
             </div>
           </div>
 
-          <div className="card-title" style={{ marginBottom: 6 }}>Character Type</div>
-          {CHARACTER_TYPES.map((t) => {
-            const info = CHARACTER_TYPE_INFO[t];
-            return (
-              <ChoiceCard
-                key={t} title={t} tagline={info?.blurb} best={info?.perk}
-                selected={fighter.character_type === t}
-                onSelect={() => update("character_type", t)}
-                onDetails={() => setDetails({ title: t, body: <div>{info?.blurb} {info?.perk}</div> })}
-              />
-            );
-          })}
-
-          <div className="card-title" style={{ marginBottom: 6, marginTop: 12 }}>Fighting Style</div>
-          {FIGHTING_STYLES.map((s) => {
-            const info = FIGHTING_STYLE_INFO[s];
-            return (
-              <ChoiceCard
-                key={s} title={s} tagline={info?.pro} best={STYLE_BEST[s]} watch={STYLE_WATCH[s]}
-                selected={fighter.fighting_style === s}
-                onSelect={() => update("fighting_style", s)}
-                onDetails={() => setDetails({ title: s, body: <div><strong>Pro:</strong> {info?.pro}<br /><strong>Con:</strong> {info?.con}<br /><strong>Pairs well with:</strong> {info?.pairsWith}</div> })}
-              />
-            );
-          })}
+          <CompactSelectionBox label="Character Type" value={fighter.character_type} tagline={CHARACTER_TYPE_INFO[fighter.character_type]?.blurb} onOpen={() => setOpenPicker("characterType")} />
+          <div style={{ height: 10 }} />
+          <CompactSelectionBox label="Fighting Style" value={fighter.fighting_style} tagline={FIGHTING_STYLE_INFO[fighter.fighting_style]?.pro} onOpen={() => setOpenPicker("fightingStyle")} />
         </>
       )}
 
@@ -276,16 +275,6 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
           <PowerBudgetMeter cost={powerPointCost} cap={cap} />
 
           <div className="card">
-            <div className="field">
-              <label>Planned Mode / Power Cap</label>
-              <select value={cap} onChange={(e) => update("power_point_cap", Number(e.target.value))}>
-                <option value={POWER_POINT_CAPS["1v1"]}>1v1 — cap 10</option>
-                <option value={POWER_POINT_CAPS["2v2"]}>2v2 — cap 9</option>
-                <option value={POWER_POINT_CAPS["3v3"]}>3v3 — cap 8</option>
-                <option value={POWER_POINT_CAPS["5v5"]}>5v5 — cap 7</option>
-              </select>
-            </div>
-
             <div className="field">
               <label>Power Source</label>
               <select value={fighter.power_source} onChange={(e) => update("power_source", e.target.value)}>
@@ -360,7 +349,7 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
 
       {step === 2 && (
         <>
-          <StatDonutChart stats={{ strength: fighter.strength, speed: fighter.speed, durability: fighter.durability, battle_iq: fighter.battle_iq, stamina: fighter.stamina }} />
+          <StatDonutChart fighter={fighter} stats={{ strength: fighter.strength, speed: fighter.speed, durability: fighter.durability, battle_iq: fighter.battle_iq, stamina: fighter.stamina }} />
 
           <div className="card">
             <div className="card-title">Stats — must total exactly 100</div>
@@ -396,18 +385,15 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
             {AURA_SWATCHES.map((c) => (
-              <button
-                key={c} onClick={() => updateVisual("auraColor", c)}
-                style={{
-                  width: 34, height: 34, borderRadius: "50%", background: c, cursor: "pointer",
-                  border: fighter.visual_config?.auraColor === c ? "3px solid white" : "1px solid var(--line)"
-                }}
-              />
+              <button key={c} onClick={() => updateVisual("auraColor", c)} style={{ width: 34, height: 34, borderRadius: "50%", background: c, cursor: "pointer", border: fighter.visual_config?.auraColor === c ? "3px solid white" : "1px solid var(--line)" }} />
             ))}
-            <button className="btn btn-ghost" style={{ width: "auto", padding: "6px 12px", marginBottom: 0 }} onClick={() => updateVisual("auraColor", null)}>Use Default</button>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-ghost" style={{ marginBottom: 0, width: "auto", padding: "8px 14px" }} onClick={() => updateVisual("auraColor", AURA_SWATCHES[Math.floor(Math.random() * AURA_SWATCHES.length)])}>🎲 Randomize Look</button>
+            <button className="btn btn-ghost" style={{ marginBottom: 0, width: "auto", padding: "8px 14px" }} onClick={() => updateVisual("auraColor", null)}>Reset to Default</button>
           </div>
 
-          <div className="card-title">Portrait</div>
+          <div className="card-title" style={{ marginTop: 16 }}>Portrait</div>
           <div style={{ fontSize: 12.5, color: "var(--text-dim)" }}>
             Custom portrait uploads are available from the Saved Fighters card after saving.
           </div>
@@ -418,23 +404,34 @@ export default function FighterBuilder({ user, profile, fighterId, duplicateFrom
         <FighterReviewCard fighter={fighter} statTotal={statTotal} powerPointCost={powerPointCost} cap={cap} badgeCount={badges.length} />
       )}
 
-      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-        {step > 0 && <button className="btn" style={{ marginBottom: 0 }} onClick={goBack}>Back</button>}
-        {step < 4 && <button className="btn btn-primary" style={{ marginBottom: 0 }} onClick={goNext}>Continue</button>}
+      <div style={{
+        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40,
+        background: "rgba(9,11,16,0.96)", borderTop: "1px solid var(--line)",
+        padding: "10px 16px", display: "flex", gap: 8, backdropFilter: "blur(6px)"
+      }}>
+        {step > 0 && <button className="btn" style={{ marginBottom: 0, flex: 1 }} onClick={goBack}>Back</button>}
+        {step < 4 ? (
+          <button className="btn btn-primary" style={{ marginBottom: 0, flex: 2 }} onClick={goNext}>Continue</button>
+        ) : (
+          <>
+            <button className="btn btn-primary" style={{ marginBottom: 0, flex: 1 }} onClick={() => handleSave(false)} disabled={saving || overCap || statTotal !== 100}>
+              {saving ? "Saving..." : "Save"}
+            </button>
+            <button className="btn btn-primary" style={{ marginBottom: 0, flex: 1 }} onClick={() => handleSave(true)} disabled={saving || overCap || statTotal !== 100}>
+              Save &amp; Fight
+            </button>
+          </>
+        )}
       </div>
 
-      {step === 4 && (
-        <>
-          <button className="btn btn-ghost" onClick={() => setStep(0)}>Edit Build</button>
-          <button className="btn btn-primary" onClick={() => handleSave(false)} disabled={saving || overCap || statTotal !== 100}>
-            {saving ? "Saving..." : "Save Fighter"}
-          </button>
-          <button className="btn btn-primary" onClick={() => handleSave(true)} disabled={saving || overCap || statTotal !== 100}>
-            Save and Fight
-          </button>
-        </>
+      {openPicker === "characterType" && (
+        <FullScreenOptionPicker title="Character Type" options={characterTypeOptions} selectedKey={fighter.character_type} onSelect={(k) => { update("character_type", k); setOpenPicker(null); }} onClose={() => setOpenPicker(null)} />
+      )}
+      {openPicker === "fightingStyle" && (
+        <FullScreenOptionPicker title="Fighting Style" options={fightingStyleOptions} selectedKey={fighter.fighting_style} onSelect={(k) => { update("fighting_style", k); setOpenPicker(null); }} onClose={() => setOpenPicker(null)} />
       )}
 
+      {showInspiration && <InspirationPickerModal onApply={handleApplyPreset} onClose={() => setShowInspiration(false)} />}
       {details && <DetailsDrawer title={details.title} onClose={() => setDetails(null)}>{details.body}</DetailsDrawer>}
       {showHelp && <HelpGuideModal onClose={() => setShowHelp(false)} />}
     </div>

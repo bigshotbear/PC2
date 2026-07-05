@@ -12,7 +12,7 @@ const AFFECTS = {
   stamina: "Sustained output and Tank/Defender damage mitigation."
 };
 
-export default function StatDonutChart({ stats }) {
+export default function StatDonutChart({ stats, fighter }) {
   const [selected, setSelected] = useState(null);
   const total = Object.values(stats).reduce((s, v) => s + v, 0);
   const data = Object.keys(LABELS).map((key) => ({ key, name: LABELS[key], value: stats[key] }));
@@ -21,6 +21,10 @@ export default function StatDonutChart({ stats }) {
   const sorted = [...data].sort((a, b) => b.value - a.value);
   const strongest = sorted.slice(0, 2).map((d) => d.name).join(" and ");
   const weakest = sorted[sorted.length - 1];
+
+  const reasoning = fighter
+    ? `Your ${fighter.fighting_style} style combined with ${strongest} places you in the ${archetype} category.`
+    : null;
 
   return (
     <div className="card">
@@ -47,6 +51,7 @@ export default function StatDonutChart({ stats }) {
       )}
 
       <div style={{ fontSize: 12.5, marginTop: 10 }}>
+        {reasoning && <div style={{ marginBottom: 6, color: "var(--gold)" }}>{reasoning}</div>}
         <div>Strongest areas: <strong style={{ color: "var(--win)" }}>{strongest}</strong></div>
         {weakest.value < 15 && <div style={{ marginTop: 2 }}>Possible concern: <strong style={{ color: "var(--loss)" }}>Low {weakest.name}</strong></div>}
       </div>

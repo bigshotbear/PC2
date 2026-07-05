@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { CHARACTER_TYPE_INFO, FIGHTING_STYLE_INFO, POWER_SOURCE_INFO } from "../lib/fighterMeta";
-import { POWER_POINT_CAPS } from "../lib/fighterOptions";
 
 const GLOSSARY = [
   { term: "Synergy", body: "Choices that work especially well together — like two fighters sharing a power source, or a Strategist paired with a Brawler." },
@@ -67,7 +66,7 @@ export default function HelpGuideModal({ onClose }) {
         )}
 
         <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 14 }}>
-          Power point caps — 1v1: {POWER_POINT_CAPS["1v1"]}, 2v2: {POWER_POINT_CAPS["2v2"]}, 3v3: {POWER_POINT_CAPS["3v3"]}, 5v5: {POWER_POINT_CAPS["5v5"]}.
+          Power point cap — a universal 10 points, the same for every battle size (1v1, 2v2, 3v3, 5v5). Your fighter works unchanged in any mode.
         </div>
 
         <button className="btn btn-primary" onClick={onClose}>Close Guide</button>
