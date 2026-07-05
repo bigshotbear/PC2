@@ -15,6 +15,12 @@ import BattleCode from "./pages/BattleCode.jsx";
 import SendChallenge from "./pages/SendChallenge.jsx";
 import AcceptChallenge from "./pages/AcceptChallenge.jsx";
 import StoryModeSetup from "./pages/StoryModeSetup.jsx";
+import StoryHome from "./pages/StoryHome.jsx";
+import StoryLevel from "./pages/StoryLevel.jsx";
+import StoryReward from "./pages/StoryReward.jsx";
+import StoryTraining from "./pages/StoryTraining.jsx";
+import StoryBossIntel from "./pages/StoryBossIntel.jsx";
+import StoryAbilityArchive from "./pages/StoryAbilityArchive.jsx";
 import PixelBattleAnimation from "./pages/PixelBattleAnimation.jsx";
 import BattleResult from "./pages/BattleResult.jsx";
 import BattleHistory from "./pages/BattleHistory.jsx";
@@ -186,6 +192,35 @@ export default function App() {
       )}
 
       {view.name === "storyModeSetup" && <StoryModeSetup user={session.user} onNavigate={navigate} />}
+
+      {view.name === "storyHome" && <StoryHome user={session.user} onNavigate={navigate} />}
+
+      {view.name === "storyLevel" && (
+        <StoryLevel user={session.user} fighterId={view.params.fighterId} onNavigate={navigate} />
+      )}
+
+      {view.name === "storyReward" && (
+        <StoryReward
+          user={session.user}
+          fighterId={view.params.fighterId}
+          bossKey={view.params.bossKey}
+          level={view.params.level}
+          grade={view.params.grade}
+          onNavigate={navigate}
+        />
+      )}
+
+      {view.name === "storyTraining" && (
+        <StoryTraining user={session.user} fighterId={view.params.fighterId} onNavigate={navigate} />
+      )}
+
+      {view.name === "storyBossIntel" && (
+        <StoryBossIntel user={session.user} fighterId={view.params.fighterId} onNavigate={navigate} />
+      )}
+
+      {view.name === "storyAbilityArchive" && (
+        <StoryAbilityArchive user={session.user} fighterId={view.params.fighterId} onNavigate={navigate} />
+      )}
 
       {view.name === "battleSetupHub" && (
         <BattleSetupHub

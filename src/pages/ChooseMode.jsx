@@ -14,7 +14,7 @@ export default function ChooseMode({ onNavigate }) {
     if (mode.key === "vsCommunity") return onNavigate("battleFlow", { mode: "computer", singlePlayerMode: "community" });
     if (mode.key === "fightFriend") return onNavigate("battleFlow", { mode: "friend" });
     if (mode.key === "enterCode") return onNavigate("battleCode");
-    if (mode.key === "story") return onNavigate("storyModeSetup");
+    if (mode.key === "story") return onNavigate("storyHome");
   };
 
   return (
