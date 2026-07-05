@@ -20,6 +20,9 @@ export default function Dashboard({ profile, onNavigate, onLogout }) {
           <div style={{ color: "var(--text-dim)", fontSize: 13 }}>
             {profile ? `Welcome back, ${profile.display_name}` : "Loading profile..."}
           </div>
+          {profile?.display_name && (
+            <div style={{ color: "var(--gold-bright)", fontSize: 13, fontWeight: 700, marginTop: 2 }}>@{profile.display_name}</div>
+          )}
         </div>
       </div>
 

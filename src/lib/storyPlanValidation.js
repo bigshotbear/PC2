@@ -28,11 +28,21 @@ function findInventedCapabilities(planText, fighter, equippedAbilities) {
 
 export function validateBattlePlan(planText, fighter, equippedAbilities) {
   const text = (planText || "").trim();
+
+  // Skipped entirely — this is allowed now. Neutral score, no penalties.
+  if (text.length === 0) {
+    return {
+      valid: true, issues: [], unsupportedClaims: [],
+      substanceScore: 50, skipped: true,
+      mentionsOwnPower: false, mentionsDefense: false, mentionsOpponent: false, length: 0
+    };
+  }
+
   const issues = [];
   const unsupportedClaims = [];
 
   if (text.length < 80) {
-    issues.push("Plan is too short/vague to evaluate meaningfully (minimum ~80 characters).");
+    issues.push("Plan is a bit short/vague to evaluate in depth (aim for ~80+ characters for full credit).");
   }
 
   BANNED_PATTERNS.forEach(({ pattern, reason }) => {
@@ -57,6 +67,7 @@ export function validateBattlePlan(planText, fighter, equippedAbilities) {
     valid: unsupportedClaims.length === 0 && text.length >= 80,
     issues, unsupportedClaims,
     substanceScore: Math.min(100, substanceScore),
+    skipped: false,
     mentionsOwnPower, mentionsDefense, mentionsOpponent,
     length: text.length
   };

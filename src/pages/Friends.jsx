@@ -183,7 +183,7 @@ export default function Friends({ user, profile, onNavigate }) {
           <div key={p.id} className="fighter-card" style={{ marginTop: 10 }}>
             <div className="fighter-thumb" />
             <div className="fighter-card-body">
-              <div className="fighter-card-name">{p.display_name}</div>
+              <div className="fighter-card-name">{p.display_name} {p.is_guest && <span className="chip" style={{ fontSize: 9, marginLeft: 4 }}>Guest</span>}</div>
             </div>
             {existingRelationIds.has(p.id) ? (
               <span className="tag-soon">Already connected</span>

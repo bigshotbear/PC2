@@ -5,7 +5,8 @@ import FighterVisual from "../components/FighterVisual.jsx";
 import QuickChallengeCard from "../components/QuickChallengeCard.jsx";
 import { getOrCreateFighterCode } from "../lib/fightCodeService";
 import { uploadPortrait, validateImageFile } from "../lib/portraitUploadService";
-import { publishCommunityBuild } from "../lib/communityBuildService";
+import { publishCommunityBuild, setCommunityBuildVisibility } from "../lib/communityBuildService";
+import { buildImagePrompt } from "../lib/imagePromptService";
 
 const LEVEL_COLORS = { Bronze: "#c17a4a", Silver: "#b7bfc9", Gold: "var(--gold-bright)" };
 
@@ -69,6 +70,9 @@ export default function SavedFighters({ user, profile, onNavigate }) {
   const [codeStatusById, setCodeStatusById] = useState({});
   const [showQuickChallenge, setShowQuickChallenge] = useState(false);
   const [headerPicking, setHeaderPicking] = useState(false);
+  const [buildCodesByFighter, setBuildCodesByFighter] = useState({});
+  const [buildCodeCopied, setBuildCodeCopied] = useState(null);
+  const [promptCopied, setPromptCopied] = useState(null);
 
   const loadFighters = async () => {
     setLoading(true);
@@ -86,6 +90,14 @@ export default function SavedFighters({ user, profile, onNavigate }) {
       return;
     }
     setFighters(data || []);
+
+    const ids = (data || []).map((f) => f.id);
+    if (ids.length > 0) {
+      const { data: builds } = await supabase.from("community_builds").select("id, fighter_id, build_code, visibility").in("fighter_id", ids);
+      const map = {};
+      (builds || []).forEach((b) => { map[b.fighter_id] = b; });
+      setBuildCodesByFighter(map);
+    }
   };
 
   useEffect(() => {
@@ -109,7 +121,9 @@ export default function SavedFighters({ user, profile, onNavigate }) {
       setError("Delete failed: " + deleteError.message);
       return;
     }
-    await supabase.from("community_builds").update({ is_active: false }).eq("fighter_id", id);
+    // Intentionally NOT deactivating the community_builds row here — the
+    // Community Build backup must remain available via its Build Code
+    // even after the personal fighter is deleted.
     setConfirmDeleteId(null);
     setFighters((prev) => prev.filter((f) => f.id !== id));
   };
@@ -133,6 +147,32 @@ export default function SavedFighters({ user, profile, onNavigate }) {
 
   const handlePortraitUploaded = (fighterId, url) => {
     setFighters((prev) => prev.map((f) => (f.id === fighterId ? { ...f, portrait_url: url } : f)));
+  };
+
+  const handleCopyBuildCode = async (fighterId) => {
+    const build = buildCodesByFighter[fighterId];
+    if (!build?.build_code) return;
+    try { await navigator.clipboard.writeText(build.build_code); setBuildCodeCopied(fighterId); setTimeout(() => setBuildCodeCopied(null), 2000); }
+    catch { window.prompt("Copy this Build Code:", build.build_code); }
+  };
+
+  const handleToggleVisibility = async (fighterId) => {
+    const build = buildCodesByFighter[fighterId];
+    if (!build) return;
+    const nextVisibility = build.visibility === "public" ? "unlisted" : "public";
+    await setCommunityBuildVisibility(build.id, nextVisibility);
+    setBuildCodesByFighter((prev) => ({ ...prev, [fighterId]: { ...build, visibility: nextVisibility } }));
+  };
+
+  const handleCopyPrompt = async (fighter) => {
+    const prompt = buildImagePrompt(fighter);
+    try { await navigator.clipboard.writeText(prompt); setPromptCopied(fighter.id); setTimeout(() => setPromptCopied(null), 2500); }
+    catch { window.prompt("Copy this image prompt:", prompt); }
+  };
+
+  const handleRemoveImage = async (fighterId) => {
+    await supabase.from("fighters").update({ portrait_url: null }).eq("id", fighterId);
+    setFighters((prev) => prev.map((f) => (f.id === fighterId ? { ...f, portrait_url: null } : f)));
   };
 
   return (
@@ -242,9 +282,29 @@ export default function SavedFighters({ user, profile, onNavigate }) {
                 </div>
               )}
 
+              {buildCodesByFighter[f.id] && (
+                <div style={{ width: "100%", marginTop: 10, borderTop: "1px solid var(--line)", paddingTop: 10 }}>
+                  <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 6 }}>
+                    BUILD CODE: <strong style={{ color: "var(--gold-bright)" }}>{buildCodesByFighter[f.id].build_code}</strong>
+                    {" "}<span className="chip" style={{ fontSize: 9 }}>{buildCodesByFighter[f.id].visibility}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button className="icon-btn" onClick={() => handleCopyBuildCode(f.id)}>{buildCodeCopied === f.id ? "Copied!" : "Copy Build Code"}</button>
+                    <button className="icon-btn" onClick={() => handleToggleVisibility(f.id)}>
+                      {buildCodesByFighter[f.id].visibility === "public" ? "Make Unlisted" : "Publish to Community"}
+                    </button>
+                    <button className="icon-btn" onClick={() => handleCopyPrompt(f)}>{promptCopied === f.id ? "Copied!" : "Copy Image Prompt"}</button>
+                    {f.portrait_url && <button className="icon-btn" onClick={() => handleRemoveImage(f.id)}>Remove Image</button>}
+                  </div>
+                </div>
+              )}
+
               {confirmDeleteId === f.id && (
                 <div style={{ position: "absolute", inset: 0, background: "rgba(9,11,16,0.92)", borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
                   <div style={{ fontSize: 14 }}>Delete {f.fighter_name}?</div>
+                  <div style={{ fontSize: 11.5, color: "var(--text-dim)", maxWidth: 240, textAlign: "center" }}>
+                    Deleting this personal fighter will remove your editable copy. Its Community Build backup will remain available using its Build Code.
+                  </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button className="btn btn-danger" style={{ width: "auto", padding: "8px 16px", marginBottom: 0 }} onClick={() => handleDelete(f.id)}>Delete</button>
                     <button className="btn btn-ghost" style={{ width: "auto", padding: "8px 16px", marginBottom: 0 }} onClick={() => setConfirmDeleteId(null)}>Cancel</button>

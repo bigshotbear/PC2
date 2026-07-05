@@ -81,9 +81,12 @@ export default function StoryLevel({ user, fighterId, onNavigate }) {
     return planText.trim().length >= guidedText.length ? planText.trim() : guidedText;
   };
 
-  const handleSubmitPlan = async () => {
-    const finalPlan = composedPlan();
-    if (finalPlan.length < 80) { setError("Your plan needs more detail (about 80 characters minimum) before it can be evaluated."); return; }
+  const handleSubmitPlan = async (skip = false) => {
+    const finalPlan = skip ? "" : composedPlan();
+    if (!skip && finalPlan.length > 0 && finalPlan.length < 40) {
+      setError("Add a bit more detail, or use Skip if you'd rather fight without a written plan.");
+      return;
+    }
     setError("");
     setStep("fighting");
     setPhaseIndex(0);
@@ -131,10 +134,27 @@ export default function StoryLevel({ user, fighterId, onNavigate }) {
   if (step === "fighting" && judgment) {
     const phase = judgment.fightPhases[phaseIndex];
     const isLast = phaseIndex === judgment.fightPhases.length - 1;
+    const health = judgment.healthTimeline?.[phaseIndex] || { player: 100, opponent: 100 };
     return (
       <div className="page">
         <div className="card card-glow">
           <div className="card-title">{phase.phase}</div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <div style={{ flex: 1, marginRight: 10 }}>
+              <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 4 }}>{fighter.fighter_name.toUpperCase()}</div>
+              <div style={{ height: 10, borderRadius: 6, background: "#262b38", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${health.player}%`, background: "linear-gradient(90deg, var(--win), #1e9c6f)", transition: "width .4s ease" }} />
+              </div>
+            </div>
+            <div style={{ flex: 1, marginLeft: 10 }}>
+              <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 4, textAlign: "right" }}>{boss.name.toUpperCase()}</div>
+              <div style={{ height: 10, borderRadius: 6, background: "#262b38", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${health.opponent}%`, marginLeft: `${100 - health.opponent}%`, background: "linear-gradient(90deg, #ff8a8a, var(--loss))", transition: "width .4s ease" }} />
+              </div>
+            </div>
+          </div>
+
           <div style={{ display: "flex", justifyContent: "center", gap: 20, margin: "10px 0" }}>
             <FighterVisual fighter={fighter} size={90} facing="right" animated state="attack" />
             <FighterVisual fighter={{ character_type: boss.character_type, fighting_style: boss.fighting_style, power_source: boss.power_source }} size={90} facing="left" animated />
@@ -217,18 +237,31 @@ export default function StoryLevel({ user, fighterId, onNavigate }) {
         </div>
         <h2 style={{ color: "var(--gold-bright)", textTransform: "uppercase" }}>How Will You Approach This Fight?</h2>
         <div style={{ fontSize: 12.5, color: "var(--text-dim)", marginBottom: 12 }}>
-          Explain how you'll use your powers, stats, abilities, movement, defenses, environment, and the opponent's weaknesses.
-          A vague or impossible plan gets a low strategy score. You can only use what your fighter actually has.
+          Optional — write a plan for a bonus strategy score, or skip straight to the fight. A vague or impossible plan just won't score well; you can only use what your fighter actually has.
         </div>
 
         {error && <div className="error-box">{error}</div>}
 
         <div className="card">
+          <div className="card-title">Your Fighter's Actual Kit</div>
+          <div style={{ fontSize: 13, lineHeight: 1.7 }}>
+            <div>Main Power: <strong style={{ color: "var(--gold-bright)" }}>{fighter.main_power}</strong></div>
+            <div>Secondary Power: <strong style={{ color: "var(--gold-bright)" }}>{fighter.secondary_power}</strong></div>
+            {fighter.special_skill !== "None" && <div>Special Skill: <strong style={{ color: "var(--gold-bright)" }}>{fighter.special_skill}</strong></div>}
+            <div>Ultimate: <strong style={{ color: "var(--gold-bright)" }}>{fighter.ultimate_move}</strong></div>
+            {equippedAbilityObjs.length > 0 && <div>Story Abilities: <strong style={{ color: "var(--gold-bright)" }}>{equippedAbilityObjs.map((a) => a.name).join(", ")}</strong></div>}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--gold)", marginTop: 10 }}>
+            💡 Suggestion: mention {fighter.main_power}, how you'll handle {boss.signature_move}, and how you'll use the arena to your advantage.
+          </div>
+        </div>
+
+        <div className="card">
           <div className="field">
-            <label>Full Plan</label>
+            <label>Full Plan (optional)</label>
             <textarea rows={5} value={planText} onChange={(e) => setPlanText(e.target.value)} placeholder="e.g. I'll open with my main power to test their defense, stay mobile to avoid their signature move, and use the arena's..." />
           </div>
-          <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 10 }}>{planText.trim().length} characters (minimum ~80)</div>
+          <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 10 }}>{planText.trim().length} characters</div>
 
           <div className="card-title" style={{ marginTop: 6 }}>Or Use Guided Sections</div>
           {[
@@ -245,7 +278,8 @@ export default function StoryLevel({ user, fighterId, onNavigate }) {
           ))}
         </div>
 
-        <button className="btn btn-primary" onClick={handleSubmitPlan}>Submit Plan &amp; Start Battle</button>
+        <button className="btn btn-primary" onClick={() => handleSubmitPlan(false)}>Submit Plan &amp; Start Battle</button>
+        <button className="btn btn-ghost" onClick={() => handleSubmitPlan(true)}>Skip — Fight Without a Plan</button>
       </div>
     );
   }

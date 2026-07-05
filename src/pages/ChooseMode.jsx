@@ -42,6 +42,7 @@ export default function ChooseMode({ onNavigate }) {
 
       <button className="btn" style={{ marginTop: 6 }} onClick={() => onNavigate("savedFighters")}>Saved Fighters</button>
       <button className="btn" onClick={() => onNavigate("savedTeams")}>Saved Teams (optional presets)</button>
+      <button className="btn" onClick={() => onNavigate("communityBuilds")}>Community Builds</button>
       <button className="btn" onClick={() => onNavigate("battleHistory")}>Battle History</button>
     </div>
   );

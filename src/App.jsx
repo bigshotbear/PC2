@@ -28,6 +28,8 @@ import Profile from "./pages/Profile.jsx";
 import CustomPowerJudge from "./pages/CustomPowerJudge.jsx";
 import ComingSoon from "./pages/ComingSoon.jsx";
 import BadgeGuide from "./pages/BadgeGuide.jsx";
+import ChooseDisplayName from "./pages/ChooseDisplayName.jsx";
+import CommunityBuilds from "./pages/CommunityBuilds.jsx";
 
 // Simple state-driven navigation. No router dependency needed since
 // this app is a single authenticated flow, not deep-linkable pages.
@@ -76,24 +78,40 @@ export default function App() {
     }
 
     // Profile row is missing (e.g. first login after signup) — create it.
-    const displayName =
-      user.user_metadata?.display_name || user.email?.split("@")[0] || "Fighter";
+    // Anonymous (guest) users have no email/metadata name — that's expected;
+    // they'll be routed to the mandatory Choose Display Name screen.
+    const isGuest = !!user.is_anonymous;
+    const proposedName = user.user_metadata?.display_name || (user.email ? user.email.split("@")[0] : null);
+    const normalized = proposedName ? proposedName.trim().toLowerCase() : null;
 
-    const { data: created, error: insertError } = await supabase
+    const basePayload = {
+      id: user.id,
+      email: user.email || null,
+      is_guest: isGuest,
+      total_wins: 0,
+      total_losses: 0,
+      total_battles: 0,
+      win_rate: 0,
+      current_win_streak: 0,
+      longest_win_streak: 0
+    };
+
+    let { data: created, error: insertError } = await supabase
       .from("profiles")
-      .insert({
-        id: user.id,
-        display_name: displayName,
-        email: user.email,
-        total_wins: 0,
-        total_losses: 0,
-        total_battles: 0,
-        win_rate: 0,
-        current_win_streak: 0,
-        longest_win_streak: 0
-      })
+      .insert({ ...basePayload, display_name: proposedName, normalized_display_name: normalized })
       .select()
       .single();
+
+    // Name collision (rare, e.g. two signups racing for the same alias) —
+    // fall back to no name rather than failing the whole signup; the user
+    // picks a different one on the mandatory Choose Display Name screen.
+    if (insertError && String(insertError.message).includes("duplicate")) {
+      ({ data: created, error: insertError } = await supabase
+        .from("profiles")
+        .insert({ ...basePayload, display_name: null, normalized_display_name: null })
+        .select()
+        .single());
+    }
 
     if (insertError) {
       console.error("Failed to create profile:", insertError.message);
@@ -133,12 +151,18 @@ export default function App() {
     return <Auth />;
   }
 
+  if (profile && !profile.display_name) {
+    return <ChooseDisplayName user={session.user} onDone={() => loadProfile(session.user)} />;
+  }
+
   // Authenticated — route between pages via lightweight state machine.
   return (
     <div className="app-shell">
       {view.name === "dashboard" && (
         <Dashboard profile={profile} onNavigate={navigate} onLogout={handleLogout} />
       )}
+
+      {view.name === "communityBuilds" && <CommunityBuilds user={session.user} onNavigate={navigate} />}
 
       {view.name === "chooseMode" && <ChooseMode onNavigate={navigate} />}
 

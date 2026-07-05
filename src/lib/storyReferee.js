@@ -60,6 +60,15 @@ function scoreMatchup(fighter, boss, equippedAbilities) {
 
 function scoreStrategy(planText, fighter, boss, equippedAbilities) {
   const validation = validateBattlePlan(planText, fighter, equippedAbilities);
+
+  if (validation.skipped) {
+    return {
+      score: 50, strengths: [], holes: [],
+      unsupportedClaims: [], validation,
+      skipped: true
+    };
+  }
+
   const strengths = [];
   const holes = [...validation.issues];
 
@@ -78,7 +87,7 @@ function scoreStrategy(planText, fighter, boss, equippedAbilities) {
   if (arenaAware) score += 5;
   score = Math.max(0, Math.min(100, score));
 
-  return { score, strengths, holes, unsupportedClaims: validation.unsupportedClaims, validation };
+  return { score, strengths, holes, unsupportedClaims: validation.unsupportedClaims, validation, skipped: false };
 }
 
 function scoreOpponentAI(boss) {
@@ -102,6 +111,20 @@ function gradeFromMargin(won, margin, strategyScore) {
   if (margin > 15) return "A";
   if (margin > 6) return "B";
   return "C";
+}
+
+function buildHealthTimeline(won, margin) {
+  const loserFinal = Math.max(0, Math.round(20 - margin * 0.4));
+  const winnerFinal = Math.max(20, Math.round(75 - margin * 0.3));
+  const steps = 5;
+  const timeline = [];
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1);
+    const winnerHealth = Math.round(100 - (100 - winnerFinal) * t);
+    const loserHealth = Math.round(100 - (100 - loserFinal) * t);
+    timeline.push(won ? { player: winnerHealth, opponent: loserHealth } : { player: loserHealth, opponent: winnerHealth });
+  }
+  return timeline;
 }
 
 export function judgeStoryBattle({ fighter, progress, boss, equippedAbilities, planText }) {
@@ -167,20 +190,25 @@ export function judgeStoryBattle({ fighter, progress, boss, equippedAbilities, p
     biggestPlayerAdvantage: biggestPlayerAdvantage ? biggestPlayerAdvantage.stat : null,
     biggestOpponentAdvantage: biggestOpponentAdvantage ? biggestOpponentAdvantage.stat : null,
     playerEffectiveStats: playerStats,
-    margin: Math.round(margin)
+    margin: Math.round(margin),
+    healthTimeline: buildHealthTimeline(won, margin)
   };
 }
 
 function buildFightPhases({ fighter, boss, statResult, matchupResult, strategyResult, won }) {
-  const opener = strategyResult.strengths[0] || "You opened cautiously, feeling out the matchup.";
+  const opener = strategyResult.skipped
+    ? `${fighter.fighter_name} enters with no set plan — pure instinct and stats.`
+    : (strategyResult.strengths[0] || "You opened cautiously, feeling out the matchup.");
   const adaptation = matchupResult.interactions[0] || `${boss.name} adjusted to your opening approach.`;
   const clash = statResult.advantages.find((a) => a.favors !== "even");
   const clashLine = clash
     ? `${clash.favors === "player" ? "Your" : boss.name + "'s"} ${clash.stat.replace("_", " ")} advantage started to show.`
     : "Both fighters traded even exchanges.";
-  const turn = strategyResult.holes[0]
-    ? `A gap in the plan (${strategyResult.holes[0].toLowerCase()}) gave ${boss.name} an opening.`
-    : "Your plan held up under pressure.";
+  const turn = strategyResult.skipped
+    ? "With no plan to lean on, the fight came down to pure build and matchup."
+    : (strategyResult.holes[0]
+      ? `A gap in the plan (${strategyResult.holes[0].toLowerCase()}) gave ${boss.name} an opening.`
+      : "Your plan held up under pressure.");
   const finish = won
     ? `${fighter.fighter_name} closed it out.`
     : `${boss.name} finished the fight with ${boss.signature_move}.`;

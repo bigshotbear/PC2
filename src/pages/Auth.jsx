@@ -9,6 +9,8 @@ export default function Auth() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showGuestWarning, setShowGuestWarning] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -54,6 +56,21 @@ export default function Auth() {
     if (signInError) {
       setError(signInError.message);
     }
+  };
+
+  const handlePlayAsGuest = async () => {
+    setGuestLoading(true);
+    setError("");
+    const { error: guestError } = await supabase.auth.signInAnonymously();
+    setGuestLoading(false);
+    if (guestError) {
+      setError("Could not start guest mode: " + guestError.message);
+      setShowGuestWarning(false);
+      return;
+    }
+    // App.jsx will detect the new anonymous session and route to the
+    // mandatory display-name screen automatically since is_guest profiles
+    // are created with no display_name yet.
   };
 
   return (
@@ -138,8 +155,31 @@ export default function Auth() {
               {loading ? "Please wait..." : mode === "signup" ? "Create Account" : "Log In"}
             </button>
           </form>
+
+          <button type="button" className="btn btn-ghost" onClick={() => setShowGuestWarning(true)}>
+            Play as Guest
+          </button>
         </div>
       </div>
+
+      {showGuestWarning && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(9,11,16,0.92)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div className="card card-glow" style={{ maxWidth: 380, width: "100%", marginBottom: 0 }}>
+            <div className="card-title" style={{ fontSize: 16, marginBottom: 10 }}>Guest Mode</div>
+            <p style={{ fontSize: 13.5, lineHeight: 1.6 }}>
+              Your fighters and progress will remain on this device and browser.
+            </p>
+            <p style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--text-dim)" }}>
+              Clearing browser data, using private/incognito mode, signing out, or changing devices may remove access to this guest account. Your Community Build codes can still be used to recover your fighters.
+            </p>
+            {error && <div className="error-box">{error}</div>}
+            <button className="btn btn-primary" onClick={handlePlayAsGuest} disabled={guestLoading}>
+              {guestLoading ? "Starting..." : "Continue as Guest"}
+            </button>
+            <button className="btn btn-ghost" onClick={() => setShowGuestWarning(false)}>Create Account Instead</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
