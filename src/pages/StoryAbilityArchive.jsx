@@ -5,7 +5,7 @@ import { getOrCreateStoryProgress, getUnlockedAbilities, updateStoryProgress } f
 export default function StoryAbilityArchive({ user, fighterId, onNavigate }) {
   const [progress, setProgress] = useState(null);
   const [unlocked, setUnlocked] = useState([]);
-  const [slots, setSlots] = useState([null, null, null]);
+  const [slots, setSlots] = useState([null, null, null, null, null, null, null]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -13,7 +13,7 @@ export default function StoryAbilityArchive({ user, fighterId, onNavigate }) {
     (async () => {
       const p = await getOrCreateStoryProgress(user.id, fighterId);
       setProgress(p);
-      setSlots([p.equipped_ability_1, p.equipped_ability_2, p.equipped_ability_3]);
+      setSlots([p.equipped_ability_1, p.equipped_ability_2, p.equipped_ability_3, p.equipped_ability_4, p.equipped_ability_5, p.equipped_ability_6, p.equipped_ability_7]);
       const u = await getUnlockedAbilities(user.id, fighterId);
       setUnlocked(u);
       setLoading(false);
@@ -28,7 +28,7 @@ export default function StoryAbilityArchive({ user, fighterId, onNavigate }) {
       return;
     }
     const emptyIndex = slots.findIndex((s) => !s);
-    if (emptyIndex === -1) { setError("All 3 slots full — unequip one first."); return; }
+    if (emptyIndex === -1) { setError("All 7 slots full — unequip one first."); return; }
     const next = [...slots];
     next[emptyIndex] = abilityKey;
     setSlots(next);
@@ -36,7 +36,8 @@ export default function StoryAbilityArchive({ user, fighterId, onNavigate }) {
 
   const handleSave = async () => {
     await updateStoryProgress(progress.id, {
-      equipped_ability_1: slots[0], equipped_ability_2: slots[1], equipped_ability_3: slots[2]
+      equipped_ability_1: slots[0], equipped_ability_2: slots[1], equipped_ability_3: slots[2],
+      equipped_ability_4: slots[3], equipped_ability_5: slots[4], equipped_ability_6: slots[5], equipped_ability_7: slots[6]
     });
     onNavigate("storyHome", { fighterId });
   };
@@ -54,7 +55,7 @@ export default function StoryAbilityArchive({ user, fighterId, onNavigate }) {
 
       <div className="card card-glow">
         <div className="card-title">Equipped Slots</div>
-        {[0, 1, 2].map((i) => {
+        {[0, 1, 2, 3, 4, 5, 6].map((i) => {
           const ability = slots[i] ? getAbilityByKey(slots[i]) : null;
           return (
             <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>

@@ -2,7 +2,9 @@
 // difficultyMult expresses the spec's approximate 80-160% baseline
 // difficulty curve relative to a freshly created fighter.
 
-export const STORY_BOSSES = [
+import { ARC2_BOSSES } from "./storyBossesArc2";
+
+const ARC1_BOSSES = [
   {
     key: "stoneclaw",
     level: 1,
@@ -236,7 +238,7 @@ export const STORY_BOSSES = [
       { key: "null_field", name: "Null Field", type: "debuff", desc: "Temporarily disrupts one equipped ability.", visual: "void_ring" }
     ],
     primaryReward: "void_collapse",
-    helpsAgainst: null,
+    helpsAgainst: "the_puddle_problem",
     hints: {
       0: "The Void King has studied every fighter who ever stood here. It will not be predictable.",
       1: "Oblivion's Edge is preceded by reality itself thinning to haze. There is no safe distance from it.",
@@ -251,6 +253,9 @@ export const STORY_BOSSES = [
     }
   }
 ];
+
+export const STORY_BOSSES = [...ARC1_BOSSES, ...ARC2_BOSSES];
+export const TOTAL_STORY_LEVELS = STORY_BOSSES.length;
 
 export function getBossByLevel(level) {
   return STORY_BOSSES.find((b) => b.level === level) || null;

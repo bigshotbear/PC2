@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import FighterVisual from "../components/FighterVisual.jsx";
-import { getBossByLevel, getAbilityByKey } from "../lib/storyBosses";
+import { getBossByLevel, getAbilityByKey, TOTAL_STORY_LEVELS } from "../lib/storyBosses";
 import { computeEffectiveStats, STAT_KEYS } from "../lib/storyEngine";
 import { judgeStoryBattleSafe } from "../lib/storyRefereeService";
 import { pickBossDialogue } from "../lib/storyDialogue";
@@ -58,7 +58,7 @@ export default function StoryLevel({ user, fighterId, onNavigate }) {
         setProgress(p);
         const boss = getBossByLevel(p.current_level);
         if (boss) setBossProgress(await getOrCreateBossProgress(user.id, fighterId, boss.key));
-        setEquippedAbilities([p.equipped_ability_1, p.equipped_ability_2, p.equipped_ability_3].filter(Boolean));
+        setEquippedAbilities([p.equipped_ability_1, p.equipped_ability_2, p.equipped_ability_3, p.equipped_ability_4, p.equipped_ability_5, p.equipped_ability_6, p.equipped_ability_7].filter(Boolean));
       } catch (e) {
         setError("Could not load level: " + e.message);
       }
@@ -297,7 +297,7 @@ export default function StoryLevel({ user, fighterId, onNavigate }) {
         <button className="back-btn" onClick={() => onNavigate("storyHome", { fighterId })}>← Story Home</button>
       </div>
 
-      <h2 style={{ color: "var(--gold-bright)", textTransform: "uppercase" }}>Level {progress.current_level} of 7 — Opponent Intel</h2>
+      <h2 style={{ color: "var(--gold-bright)", textTransform: "uppercase" }}>Level {progress.current_level} of {TOTAL_STORY_LEVELS} — Opponent Intel</h2>
 
       <div className="card card-glow">
         <div className="card-title">{boss.name}</div>

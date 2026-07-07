@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getBossByKey } from "../lib/storyBosses";
+import { getBossByKey, TOTAL_STORY_LEVELS } from "../lib/storyBosses";
 import { STAT_KEYS } from "../lib/storyEngine";
 import { getOrCreateStoryProgress, getUnlockedAbilities, unlockAbility, updateStoryProgress } from "../lib/storyService";
 
@@ -38,7 +38,7 @@ export default function StoryReward({ user, fighterId, bossKey, level, grade, on
   };
 
   const advanceAfterReward = async () => {
-    if (level >= 7) {
+    if (level >= TOTAL_STORY_LEVELS) {
       await updateStoryProgress(progress.id, {
         completed_runs: (progress.completed_runs || 0) + 1,
         final_boss_victories: (progress.final_boss_victories || 0) + 1,
@@ -91,8 +91,8 @@ export default function StoryReward({ user, fighterId, bossKey, level, grade, on
     return (
       <div className="page">
         <div className="card card-glow" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 26, color: "var(--gold-bright)", fontWeight: 700 }}>CONQUEROR OF THE SEVEN</div>
-          <p style={{ fontSize: 14, marginTop: 10 }}>The Void King falls. Your fighter's name is etched into Power Clash history.</p>
+          <div style={{ fontSize: 26, color: "var(--gold-bright)", fontWeight: 700 }}>CAMPAIGN CONQUERED</div>
+          <p style={{ fontSize: 14, marginTop: 10 }}>The Everything Guy falls. Your fighter's name is etched into Power Clash history.</p>
           <p style={{ fontSize: 12.5, color: "var(--text-dim)", marginTop: 10 }}>Higher challenge paths will become available in a future update.</p>
         </div>
         <button className="btn btn-primary" onClick={() => onNavigate("storyHome", { fighterId })}>Return to Story Home</button>

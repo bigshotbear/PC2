@@ -83,7 +83,7 @@ export default function StoryHome({ user, onNavigate }) {
               <div className="card card-glow" style={{ textAlign: "center" }}>
                 <div style={{ width: 100, height: 100, margin: "0 auto" }}><FighterVisual fighter={fighter} size={100} animated /></div>
                 <div style={{ fontWeight: 700, fontSize: 18, marginTop: 8 }}>{fighter.fighter_name}</div>
-                {progress.conqueror_of_seven && <div className="chip" style={{ marginTop: 6, borderColor: "var(--gold-bright)", color: "var(--gold-bright)" }}>Conqueror of the Seven</div>}
+                {progress.conqueror_of_seven && <div className="chip" style={{ marginTop: 6, borderColor: "var(--gold-bright)", color: "var(--gold-bright)" }}>Campaign Conquered</div>}
               </div>
 
               <div className="card">
@@ -115,7 +115,7 @@ export default function StoryHome({ user, onNavigate }) {
 
               <div className="card">
                 <div className="card-title">Equipped Story Abilities</div>
-                {[progress.equipped_ability_1, progress.equipped_ability_2, progress.equipped_ability_3].map((key, i) => {
+                {[progress.equipped_ability_1, progress.equipped_ability_2, progress.equipped_ability_3, progress.equipped_ability_4, progress.equipped_ability_5, progress.equipped_ability_6, progress.equipped_ability_7].map((key, i) => {
                   const ability = key ? getAbilityByKey(key) : null;
                   return (
                     <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>

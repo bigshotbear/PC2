@@ -26,7 +26,39 @@ export const ABILITY_EFFECTS = {
   storm_field: { statKey: "battle_iq", flatBonus: 4 },
   void_collapse: { statKey: "strength", flatBonus: 8 },
   echo_step: { statKey: "speed", flatBonus: 6 },
-  null_field: { statKey: "battle_iq", flatBonus: 5 }
+  null_field: { statKey: "battle_iq", flatBonus: 5 },
+
+  // --- Arc 2: The Society ---
+  no_hands_discount: { statKey: "durability", flatBonus: 6, vsBonusPct: 0.25 },
+  puddle_slap: { statKey: "strength", flatBonus: 4 },
+  gutter_dive: { statKey: "speed", flatBonus: 3 },
+  it_just_bounces_off: { statKey: "durability", flatBonus: 6, vsBonusPct: 0.25 },
+  overdrive_haymaker: { statKey: "strength", flatBonus: 6 },
+  warranty_void: { statKey: "strength", flatBonus: 4 },
+  tingly_numb_poke: { statKey: "battle_iq", flatBonus: 6, vsBonusPct: 0.25 },
+  quiet_step: { statKey: "speed", flatBonus: 5 },
+  blade_lecture: { statKey: "battle_iq", flatBonus: 3 },
+  one_more_rep: { statKey: "strength", flatBonus: 8, vsBonusPct: 0.25 },
+  protein_reserves: { statKey: "stamina", flatBonus: 5 },
+  gym_bro_wisdom: { statKey: "stamina", flatBonus: 3 },
+  five_finger_discount: { statKey: "battle_iq", flatBonus: 6, vsBonusPct: 0.25 },
+  polite_negotiation: { statKey: "battle_iq", flatBonus: 4 },
+  return_policy: { statKey: "battle_iq", flatBonus: 3 },
+  its_just_dust_now: { statKey: "strength", flatBonus: 6, vsBonusPct: 0.25 },
+  structural_integrity_denial: { statKey: "strength", flatBonus: 4 },
+  calm_before_the_crumble: { statKey: "durability", flatBonus: 3 },
+  regenerate_exe: { statKey: "stamina", flatBonus: 6, vsBonusPct: 0.25 },
+  understudy_footwork: { statKey: "speed", flatBonus: 5 },
+  second_wind_drink: { statKey: "stamina", flatBonus: 4 },
+  big_mad_energy: { statKey: "strength", flatBonus: 6, vsBonusPct: 0.25 },
+  corporate_composure: { statKey: "durability", flatBonus: 4 },
+  email_the_whole_team: { statKey: "battle_iq", flatBonus: 3 },
+  delete_city_bat: { statKey: "strength", flatBonus: 8, vsBonusPct: 0.25 },
+  too_much_power: { statKey: "strength", flatBonus: 4 },
+  unstable_flicker: { statKey: "speed", flatBonus: 4 },
+  one_power_to_rule: { statKey: "strength", flatBonus: 8 },
+  collector_of_everything: { statKey: "battle_iq", flatBonus: 5 },
+  final_form_no_really: { statKey: "stamina", flatBonus: 5 }
 };
 
 export const STAT_KEYS = ["strength", "speed", "durability", "battle_iq", "stamina"];
