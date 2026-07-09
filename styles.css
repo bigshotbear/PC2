@@ -33,11 +33,13 @@ body,
 
 body {
   background:
-    radial-gradient(circle at 15% -10%, rgba(230, 184, 74, 0.10), transparent 38%),
-    radial-gradient(circle at 100% 5%, rgba(56, 214, 240, 0.07), transparent 32%),
-    radial-gradient(circle at 50% 110%, rgba(160, 107, 255, 0.06), transparent 40%),
-    radial-gradient(circle at 100% 100%, rgba(63, 224, 160, 0.04), transparent 35%),
+    radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    radial-gradient(circle at 15% -10%, rgba(230, 184, 74, 0.14), transparent 38%),
+    radial-gradient(circle at 100% 5%, rgba(56, 214, 240, 0.10), transparent 32%),
+    radial-gradient(circle at 50% 110%, rgba(160, 107, 255, 0.09), transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(63, 224, 160, 0.06), transparent 35%),
     var(--bg-void);
+  background-size: 16px 16px, auto, auto, auto, auto, auto;
   color: var(--text-main);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -47,6 +49,8 @@ h1, h2, h3, h4, .display {
   font-family: var(--font-display);
   letter-spacing: 0.03em;
   margin: 0;
+  font-weight: 700;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
 }
 
 button {
@@ -111,21 +115,22 @@ a { color: inherit; }
 
 .card {
   background: linear-gradient(180deg, var(--bg-panel-raised), var(--bg-panel));
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
   padding: 18px;
   margin-bottom: 14px;
   position: relative;
   overflow: hidden;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35);
 }
 
 .card::before {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: 14px;
+  border-radius: 10px;
   padding: 1px;
-  background: linear-gradient(135deg, rgba(230, 184, 74, 0.35), transparent 40%);
+  background: linear-gradient(135deg, rgba(230, 184, 74, 0.45), transparent 40%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -133,36 +138,37 @@ a { color: inherit; }
 }
 
 .card-glow {
-  box-shadow: 0 0 0 1px rgba(230, 184, 74, 0.25), 0 0 24px rgba(230, 184, 74, 0.12);
+  border-color: var(--gold);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35), 0 0 26px rgba(230, 184, 74, 0.25);
 }
 
 /* Color-coded card variants — gold=progression, cyan=guidance/tech,
    purple=abilities/advanced, red=danger/boss, green=success, blue=tactics.
-   Applied as extra classes: className="card card-cyan" etc. */
+   Now a real colored border + hard shadow, not just a faint glow. */
 .card-cyan {
-  border-color: rgba(56, 214, 240, 0.35);
-  box-shadow: 0 0 0 1px rgba(56, 214, 240, 0.2), 0 0 20px rgba(56, 214, 240, 0.1);
+  border-color: var(--cyan);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35), 0 0 22px rgba(56, 214, 240, 0.2);
 }
 .card-purple {
-  border-color: rgba(160, 107, 255, 0.35);
-  box-shadow: 0 0 0 1px rgba(160, 107, 255, 0.2), 0 0 20px rgba(160, 107, 255, 0.1);
+  border-color: var(--purple);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35), 0 0 22px rgba(160, 107, 255, 0.2);
 }
 .card-danger {
-  border-color: rgba(255, 84, 104, 0.4);
-  box-shadow: 0 0 0 1px rgba(255, 84, 104, 0.22), 0 0 20px rgba(255, 84, 104, 0.12);
+  border-color: var(--loss);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35), 0 0 22px rgba(255, 84, 104, 0.25);
 }
 .card-success {
-  border-color: rgba(63, 224, 160, 0.4);
-  box-shadow: 0 0 0 1px rgba(63, 224, 160, 0.22), 0 0 20px rgba(63, 224, 160, 0.12);
+  border-color: var(--win);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35), 0 0 22px rgba(63, 224, 160, 0.25);
 }
 .card-blue {
-  border-color: rgba(74, 143, 230, 0.4);
-  box-shadow: 0 0 0 1px rgba(74, 143, 230, 0.22), 0 0 18px rgba(74, 143, 230, 0.1);
+  border-color: var(--blue);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35), 0 0 20px rgba(74, 143, 230, 0.2);
 }
 
 /* Comic-panel accent strip along the top edge of a card */
 .card-panel {
-  border-top: 3px solid var(--gold);
+  border-top: 4px solid var(--gold);
 }
 .card-panel.cyan { border-top-color: var(--cyan); }
 .card-panel.purple { border-top-color: var(--purple); }
@@ -171,8 +177,8 @@ a { color: inherit; }
 .card-panel.blue { border-top-color: var(--blue); }
 
 @keyframes pc-energy-pulse {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(230, 184, 74, 0.35), 0 0 18px rgba(230, 184, 74, 0.15); }
-  50% { box-shadow: 0 0 0 1px rgba(230, 184, 74, 0.55), 0 0 32px rgba(230, 184, 74, 0.3); }
+  0%, 100% { box-shadow: 4px 4px 0 rgba(0,0,0,0.35), 0 0 18px rgba(230, 184, 74, 0.25); }
+  50% { box-shadow: 4px 4px 0 rgba(0,0,0,0.35), 0 0 34px rgba(230, 184, 74, 0.45); }
 }
 .pc-pulse { animation: pc-energy-pulse 2.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .pc-pulse { animation: none; } }
@@ -188,28 +194,30 @@ a { color: inherit; }
 /* Hero header for the Dashboard — gradient superhero-HQ banner */
 .hero-header {
   position: relative;
-  border-radius: 18px;
+  border-radius: 14px;
   padding: 24px 20px;
   margin-bottom: 18px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 15% 20%, rgba(230, 184, 74, 0.22), transparent 55%),
-    radial-gradient(circle at 90% 0%, rgba(56, 214, 240, 0.14), transparent 50%),
-    radial-gradient(circle at 100% 100%, rgba(160, 107, 255, 0.10), transparent 55%),
+    radial-gradient(circle at 15% 20%, rgba(230, 184, 74, 0.3), transparent 55%),
+    radial-gradient(circle at 90% 0%, rgba(56, 214, 240, 0.2), transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(160, 107, 255, 0.15), transparent 55%),
     linear-gradient(160deg, #1b1f2c, #0e1017);
-  border: 1px solid rgba(230, 184, 74, 0.3);
+  border: 3px solid var(--gold);
+  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.4);
 }
 .hero-header::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(115deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 40px);
+  background-image: radial-gradient(rgba(255,255,255,0.06) 1.2px, transparent 1.2px);
+  background-size: 14px 14px;
   pointer-events: none;
 }
-.hero-name { font-size: 26px; font-weight: 700; color: var(--gold-bright); text-transform: uppercase; letter-spacing: 0.02em; position: relative; }
-.hero-handle { font-size: 13px; color: var(--cyan-bright); margin-top: 2px; position: relative; }
+.hero-name { font-size: 28px; font-weight: 800; color: var(--gold-bright); text-transform: uppercase; letter-spacing: 0.02em; position: relative; text-shadow: 2px 2px 0 rgba(0,0,0,0.6); }
+.hero-handle { font-size: 13px; color: var(--cyan-bright); margin-top: 2px; position: relative; font-weight: 700; }
 .hero-meta-row { display: flex; gap: 16px; margin-top: 14px; flex-wrap: wrap; position: relative; }
-.hero-meta-chip { font-size: 12px; color: var(--text-dim); background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.hero-meta-chip { font-size: 12px; color: var(--text-main); background: rgba(255,255,255,0.08); border: 2px solid var(--line); border-radius: 8px; padding: 6px 10px; font-weight: 700; }
 
 .card-title {
   font-size: 13px;
@@ -247,56 +255,64 @@ a { color: inherit; }
   width: 100%;
   padding: 16px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-radius: 12px;
-  border: 1px solid var(--line);
+  border-radius: 10px;
+  border: 2px solid var(--line);
   background: var(--bg-panel-raised);
   color: var(--text-main);
   margin-bottom: 10px;
-  transition: transform 0.08s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, border-color 0.15s ease;
 }
 
-.btn:active { transform: scale(0.98); }
+.btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4); }
 
 .btn:hover {
   border-color: var(--gold-dim);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #3a2f10, #1c1a12);
-  border-color: var(--gold);
-  color: var(--gold-bright);
-  box-shadow: 0 0 18px rgba(230, 184, 74, 0.18);
+  background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+  border-color: #ffe9a8;
+  color: #1a1408;
+  font-weight: 800;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4), 0 0 20px rgba(230, 184, 74, 0.35);
 }
 
 .btn-primary:hover {
-  box-shadow: 0 0 26px rgba(230, 184, 74, 0.3);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4), 0 0 30px rgba(230, 184, 74, 0.5);
 }
 
 .btn-danger {
-  border-color: rgba(255, 84, 104, 0.4);
-  color: var(--loss);
+  background: linear-gradient(135deg, #ff7a8a, var(--loss));
+  border-color: #ffb3bc;
+  color: #2a0508;
+  font-weight: 800;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
 }
 
 .btn-ghost {
   background: transparent;
-  border: 1px dashed var(--line);
+  border: 2px dashed var(--line);
   color: var(--text-dim);
+  box-shadow: none;
 }
 
 .btn-cyan {
-  background: linear-gradient(135deg, rgba(56,214,240,0.16), rgba(56,214,240,0.04));
-  border-color: var(--cyan);
-  color: var(--cyan-bright);
-  box-shadow: 0 0 16px rgba(56, 214, 240, 0.15);
+  background: linear-gradient(135deg, var(--cyan-bright), var(--cyan));
+  border-color: #c8f5ff;
+  color: #04262c;
+  font-weight: 800;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4), 0 0 18px rgba(56, 214, 240, 0.3);
 }
 .btn-purple {
-  background: linear-gradient(135deg, rgba(160,107,255,0.16), rgba(160,107,255,0.04));
-  border-color: var(--purple);
-  color: var(--purple-bright);
-  box-shadow: 0 0 16px rgba(160, 107, 255, 0.15);
+  background: linear-gradient(135deg, var(--purple-bright), var(--purple));
+  border-color: #e6d6ff;
+  color: #1c0f33;
+  font-weight: 800;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4), 0 0 18px rgba(160, 107, 255, 0.3);
 }
 
 /* Badge category accents, reused across Badge Guide / Progress / Archive */
@@ -509,12 +525,13 @@ a { color: inherit; }
 
 .chip {
   font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(230, 184, 74, 0.12);
-  border: 1px solid rgba(230, 184, 74, 0.35);
+  background: rgba(230, 184, 74, 0.15);
+  border: 2px solid var(--gold);
   color: var(--gold-bright);
 }
 
